@@ -1,16 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-台灣天氣換季分析 / Taiwan Weather Analytics
-依照 Lovable PDF 初版設計製作的 Streamlit 完整版本（繁體中文 / English 切換）
-
-執行：
-    python -m pip install -r requirements.txt
-    python -m streamlit run main.py
-
-資料來源：Open-Meteo Historical Weather API（ERA5），不需要 API Key。
-右下角「問天氣 AI」為選用功能：在 .streamlit/secrets.toml 加入
-    GEMINI_API_KEY = "你的金鑰"
-"""
+# cd C:\Users\yijen\Python\weather_app .\.venv\Scripts\python.exe -m streamlit run main.py
 from __future__ import annotations
 
 import html as _html
@@ -826,7 +815,12 @@ with st.container(key="sec2"):
 # ---- 03 換季時機 ----
 with st.container(key="sec3"):
     section_header(t("sec3"), t("sec3_title"), t("sec3_sub"))
-    rules = " ｜ ".join(f"{t(k)}：{season_rule(k, t)}（{t(k + '_items')}）" for k, *_ in SEASONS)S
+
+    rules = " ｜ ".join(
+        f"{t(k)}：{season_rule(k, t)}（{t(k + '_items')}）"
+        for k, *_ in SEASONS
+    )
+
     st.caption(rules)
     plot_timeline(signals, summary, years, end, lang, t)
     st.markdown(season_table_html(signals, summary, years, lang, t), unsafe_allow_html=True)

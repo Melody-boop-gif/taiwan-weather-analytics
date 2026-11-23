@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# cd C:\Users\yijen\Python\weather_app .\.venv\Scripts\python.exe -m streamlit run main.py
+# 執行：cd C:\Users\yijen\Python\weather_app
+#      .\.venv\Scripts\python.exe -m streamlit run main.py
 from __future__ import annotations
 
 import html as _html
@@ -12,229 +13,261 @@ import requests
 import streamlit as st
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="Taiwan Weather Analytics", page_icon="🌤", layout="wide")
+st.set_page_config(
+    page_title="Taiwan Climate BI | 台灣天氣換季商業決策平台",
+    page_icon="🌤",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 # =============================================================================
-# 設定
+# 設定（想玩的話，先改這一區）
 # =============================================================================
 API_URL = "https://archive-api.open-meteo.com/v1/archive"
-DATA_LAG_DAYS = 3          # 歷史資料約晚 3 天（PDF：今天 11/23 → 資料至 11/20）
+DATA_LAG_DAYS = 3          # 歷史資料約晚 3 天
 RAINY_MM = 1.0             # 雨天定義：日雨量 >= 1mm
 MIN_DAYS_PER_MONTH = 20    # 資料不足 20 天的月份不顯示
 
-# 城市：key -> (中文名, 區域 key, 緯度, 經度)
 CITIES = {
-    "Taipei":     ("台北市", "north",   25.0330, 121.5654),
-    "New Taipei": ("新北市", "north",   25.0120, 121.4650),
-    "Taoyuan":    ("桃園市", "north",   24.9936, 121.3010),
-    "Hsinchu":    ("新竹市", "north",   24.8039, 120.9647),
-    "Yilan":      ("宜蘭縣", "east",    24.7570, 121.7530),
-    "Taichung":   ("台中市", "central", 24.1477, 120.6736),
-    "Chiayi":     ("嘉義市", "south",   23.4801, 120.4491),
-    "Tainan":     ("台南市", "south",   22.9999, 120.2270),
-    "Kaohsiung":  ("高雄市", "south",   22.6273, 120.3014),
-    "Hualien":    ("花蓮縣", "east",    23.9772, 121.6044),
-    "Taitung":    ("台東縣", "east",    22.7583, 121.1444),
+    "Taipei": ("台北市", "north", 25.0330, 121.5654),
+    "New Taipei": ("新北市", "north", 25.0120, 121.4650),
+    "Taoyuan": ("桃園市", "north", 24.9936, 121.3010),
+    "Hsinchu": ("新竹市", "north", 24.8039, 120.9647),
+    "Yilan": ("宜蘭縣", "east", 24.7570, 121.7530),
+    "Taichung": ("台中市", "central", 24.1477, 120.6736),
+    "Chiayi": ("嘉義市", "south", 23.4801, 120.4491),
+    "Tainan": ("台南市", "south", 22.9999, 120.2270),
+    "Kaohsiung": ("高雄市", "south", 22.6273, 120.3014),
+    "Hualien": ("花蓮縣", "east", 23.9772, 121.6044),
+    "Taitung": ("台東縣", "east", 22.7583, 121.1444),
 }
 
-# 換季訊號：(key, 門檻°C, 方向, 搜尋起算 (月,日))
+# 換季訊號：(key, 門檻°C, 方向, 搜尋起算 (月,日))   ← 想改門檻就改這裡的數字
 SEASONS = [
-    ("spring", 20, "up",   (1, 1)),
-    ("summer", 26, "up",   (3, 1)),
+    ("spring", 20, "up", (1, 1)),
+    ("summer", 26, "up", (3, 1)),
     ("autumn", 25, "down", (8, 1)),
     ("winter", 18, "down", (10, 1)),
 ]
 
-# 穿著溫度帶：(key, 色碼)  由熱到冷
+# 穿著溫度帶：由熱到冷
 BANDS = [
-    ("hot",  "#E0603F"),
-    ("warm", "#F0A35E"),
-    ("comf", "#D9C56A"),
-    ("cool", "#8FC0CF"),
-    ("cold", "#6F86A8"),
+    ("hot", "#E11D48"),
+    ("warm", "#F97316"),
+    ("comf", "#EAB308"),
+    ("cool", "#0EA5E9"),
+    ("cold", "#6366F1"),
 ]
 
-YEAR_COLORS = ["#B8C4D3", "#7B93AE", "#2F4568", "#DA784C"]  # 舊 → 今年
-ACCENT = "#DA784C"
-INK = "#1C2434"
+YEAR_COLORS = ["#CBD5E1", "#94A3B8", "#334155", "#E05D38"]  # 舊 → 今年
+ACCENT = "#E05D38"
+INK = "#0F172A"
 
 # =============================================================================
-# 多語系
+# 中 / 英 文字
 # =============================================================================
 T = {
     "zh": {
-        "eyebrow": "TAIWAN WEATHER ANALYTICS",
-        "app_title": "台灣天氣換季分析",
+        "live": "即時氣候資料",
         "data_until": "資料更新至 {d}",
-        "source": "來源：Open-Meteo 歷史氣象",
-        "choose_city": "選擇城市",
-        "language": "語言 / Language",
-        "north": "北部", "central": "中部", "south": "南部", "east": "東部",
-        "hero_desc": "以近 3 年每日氣溫與降雨，找出換季節奏、比較今年與往年差異，作為商品上架與檔期規劃的依據。",
+        "choose_city": "選擇觀測城市",
+        "north": "北部地區", "central": "中部地區", "south": "南部地區", "east": "東部地區",
+        "base_period": "分析期間 {a}–{b}",
+        "hero_desc": "以近 3 年每日氣溫與降雨資料，找出換季節奏與歷年差異，作為服飾商品上架、備貨、檔期與庫存調度的量化依據。",
+        "progress_title": "今年換季進度",
         "kpi_temp": "近 30 天均溫",
-        "kpi_rain": "近 30 天雨量",
-        "kpi_days": "近 30 天雨天",
+        "kpi_rain": "近 30 天累積降雨",
+        "kpi_days": "近 30 天降雨日數",
         "vs_last": "去年同期 {v}",
-        "rain_def": "（日雨量 ≥1mm）",
+        "rain_def": "日雨量 ≥ 1mm",
         "day_unit": "天",
-        "next_signal": "下一個換季訊號",
-        "est_line": "預估 {d} ・ 約 {n} 天後",
-        "est_soon": "預估 {d} ・ 即將出現",
+        "warm_tag": "偏暖", "cool_tag": "偏冷", "flat_tag": "持平", "wet_tag": "多雨", "dry_tag": "偏乾",
+        "next_signal": "下一個換季決策",
+        "focus_label": "建議主力",
+        "est_line": "預估 {d} · 約 {n} 天後",
+        "est_soon": "預估 {d} · 即將出現",
         "all_done": "今年換季訊號皆已出現",
         "spring": "春裝上架", "summer": "夏裝主推", "autumn": "秋裝上架", "winter": "冬裝主推",
-        "spring_items": "薄長袖、襯衫、輕外套",
-        "summer_items": "短袖、短褲、涼感衣",
-        "autumn_items": "長袖、針織、薄外套",
-        "winter_items": "大衣、毛衣、發熱衣",
-        "rule_up": "7日均溫 ≥ {t}°C",
-        "rule_down": "7日均溫 < {t}°C",
-        "ins_similar": "與去年同期相近",
-        "ins_similar_body": "近 30 天均溫差距僅 {d}°C，可沿用去年同期的上架節奏。",
-        "ins_warmer": "比去年同期偏暖",
-        "ins_warmer_body": "近 30 天均溫較去年同期高 {d}°C，輕薄商品可考慮提早上架。",
-        "ins_cooler": "比去年同期偏冷",
-        "ins_cooler_body": "近 30 天均溫較去年同期低 {d}°C，保暖商品可考慮提早備貨。",
-        "ins_signal": "最近訊號：{s}",
-        "ins_signal_body": "今年 {d} 出現，歷年平均約 {a}。主推：{items}。",
-        "ins_signal_none": "今年尚無訊號",
-        "ins_signal_none_body": "今年的換季訊號尚未出現，請持續觀察 7 日均溫。",
-        "ins_wet": "{m}最潮濕",
-        "ins_wet_body": "平均月雨量約 {x}mm，適合規劃外套、雨鞋、快乾材質商品。",
-        "ins_hot_cold": "最熱 {h} ・ 最冷 {c}",
-        "ins_hot_cold_body": "均溫約 {a}°C 與 {b}°C，涼感與發熱商品的庫存高峰可依此安排。",
-        "sec1": "長期走勢",
-        "sec1_title": "溫度與降雨週趨勢",
-        "sec1_sub": "觀察不同年份的氣溫與降雨變化趨勢",
-        "rng_all": "全部", "rng_1y": "近 1 年", "rng_6m": "近半年",
+        "spring_items": "薄長袖、襯衫、防風輕外套",
+        "summer_items": "短袖 T 恤、涼感衣、短褲",
+        "autumn_items": "長袖襯衫、薄針織、防風外套",
+        "winter_items": "大衣、羊毛衫、羽絨、發熱衣",
+        "rule_up": "7 日均溫 ≥ {t}°C",
+        "rule_down": "7 日均溫 < {t}°C",
+        "insights_title": "商業決策重點摘要",
+        "tag_plan": "檔期策略", "tag_shift": "檔期前移", "tag_stock": "備貨前置",
+        "tag_season": "當前季相", "tag_rain": "防雨機能", "tag_extreme": "溫差極值",
+        "ins_similar": "氣溫節奏與去年同期一致",
+        "ins_similar_body": "近 30 天均溫差距僅 {d}°C，節奏穩定，可直接沿用去年的換季陳列與行銷節奏，不必過早促銷。",
+        "ins_warmer": "比去年偏暖，輕薄商品提前佈局",
+        "ins_warmer_body": "近 30 天均溫比去年高 {d}°C，回暖較快，建議透氣輕薄商品提前 1–2 週上陳列。",
+        "ins_cooler": "比去年偏冷，保暖商品提前備貨",
+        "ins_cooler_body": "近 30 天均溫比去年低 {d}°C，建議大衣、防風外套與保暖機能品提早入庫並排定主推檔期。",
+        "ins_signal": "最近已觸發：{s}",
+        "ins_signal_body": "今年 {d} 達到門檻（歷年平均 {a}）。目前主推品類：{items}。",
+        "ins_signal_none": "目前尚無新增訊號",
+        "ins_signal_none_body": "今年的換季門檻尚未觸發，請持續觀察 7 日均溫走勢。",
+        "ins_wet": "雨量高峰：{m}最潮濕",
+        "ins_wet_body": "歷年平均月雨量約 {x}mm，為全年最高。建議加強防潑水外套、防滑鞋與快乾商品的曝光。",
+        "ins_hot_cold": "最熱 {h} · 最冷 {c}",
+        "ins_hot_cold_body": "歷年月均溫最高 {a}°C、最低 {b}°C。涼感與重磅保暖兩大檔期的庫存與下單時點可以此為基準。",
+        "sec1": "01 · 氣候走勢",
+        "sec1_title": "週均氣溫區間與週降雨量",
+        "sec1_sub": "上方看每週最低～最高溫與週均溫，下方看每週累積雨量。",
+        "rng_all": "全部年份", "rng_1y": "近 1 年", "rng_6m": "近半年",
         "temp_axis": "氣溫 (°C)", "rain_axis": "週雨量 (mm)",
-        "week_start": "{d} 起一週",
-        "wk_avg": "週均溫", "wk_range": "最低～最高", "wk_rain": "週雨量",
-        "sec2": "年度對比",
-        "sec2_title": "同月份逐年比較",
-        "sec2_sub": "看今年是偏暖、偏冷，還是偏濕。",
-        "m_temp": "溫度", "m_rain": "雨量", "m_days": "雨天數",
-        "note_temp": "月均溫 (°C) ・ 資料不足 20 天的月份不顯示",
-        "note_rain": "月雨量 (mm) ・ 資料不足 20 天的月份不顯示",
-        "note_days": "雨天數 (天) ・ 資料不足 20 天的月份不顯示",
+        "wk_avg": "週均溫", "wk_range": "週溫差區間", "wk_rain": "週降雨量",
+        "wk_max": "週最高溫", "wk_min": "週最低溫",
+        "sec2": "02 · 年度基準",
+        "sec2_title": "歷年同月份比較",
+        "sec2_sub": "一眼看出今年各月份比歷年偏暖、偏冷，還是偏濕。",
+        "m_temp": "均溫", "m_rain": "雨量", "m_days": "雨天數",
+        "note_temp": "月均溫 (°C) · 資料不足 20 天的月份不顯示",
+        "note_rain": "月降雨量 (mm) · 資料不足 20 天的月份不顯示",
+        "note_days": "月降雨天數 (天) · 日雨量 ≥ 1mm 才算雨天",
         "year_suffix": "年",
-        "sec3": "換季時機",
+        "sec3": "03 · 換季時序",
         "sec3_title": "換季訊號時間軸",
-        "sec3_sub": "以「7 日平均氣溫」首次跨越門檻的日期作為換季訊號，比較每年的提早或延後，並推估今年時間點。",
+        "sec3_sub": "7 日均溫第一次跨過門檻的那一天，就是換季訊號。比較每年早晚，並預估今年。",
         "est_legend": "今年預估",
-        "season": "訊號",
+        "season": "換季時序",
         "hist_avg": "歷年平均",
-        "not_reached": "未達",
-        "this_year_found": "今年已出現",
+        "status": "狀態",
+        "status_reached": "已達成", "status_proj": "推估中",
+        "not_reached": "尚未達成",
+        "this_year_found": "今年已觸發",
         "est_label": "預估",
         "days_after": "{n} 天後",
         "today": "資料截止",
-        "sec4": "商品企劃",
-        "sec4_title": "穿著溫度帶分佈",
-        "sec4_sub": "每個月有多少比例的日子落在各溫度帶（近 3 年合計），可作為各月商品組合的參考比重。",
+        "sec4": "04 · 商品企劃",
+        "sec4_title": "月份穿著溫度帶分佈",
+        "sec4_sub": "每個月有多少比例的日子落在各溫度帶（近 3 年合計），作為各月商品組合的參考比重。",
+        "band_header": "溫度帶 / 建議品類",
         "hot": "炎熱 ≥28°C", "warm": "溫暖 24–28°C", "comf": "舒適 20–24°C",
         "cool": "微涼 16–20°C", "cold": "寒冷 <16°C",
-        "hot_items": "背心、短袖、涼感", "warm_items": "短袖、薄襯衫",
-        "comf_items": "薄長袖、針織", "cool_items": "外套、衛衣", "cold_items": "大衣、羽絨、發熱衣",
-        "footnote": "溫度為每日 2 公尺氣溫（ERA5 再分析資料），雨天定義為日雨量 ≥ 1mm。換季日期以 7 日均溫首次跨越門檻、且之後 7 天中至少 5 天維持同側判定。",
-        "ask_ai": "問天氣 AI",
-        "ai_title": "問天氣 AI",
-        "ai_placeholder": "例如：今年秋裝上架會比去年早嗎？",
-        "ai_send": "送出",
-        "ai_thinking": "思考中…",
+        "hot_items": "背心、短袖 T 恤、涼感機能", "warm_items": "短袖襯衫、輕薄長褲",
+        "comf_items": "薄長袖、針織衫、休閒長褲", "cool_items": "防風外套、衛衣、休閒夾克",
+        "cold_items": "羊毛大衣、羽絨外套、發熱衣",
+        "footnote": "資料說明：氣溫為 ECMWF ERA5 的 2 公尺再分析資料，雨天定義為日雨量 ≥ 1mm。換季訊號為 7 日均溫首次跨過門檻，且之後 7 天中至少 5 天維持在同一側。",
+        "ask_ai": "問天氣 AI 顧問",
+        "ai_title": "零售氣象 AI 顧問",
+        "ai_hint": "輸入營運問題，AI 會根據氣溫、降雨與換季門檻資料回答。",
+        "ai_placeholder": "例如：今年秋裝換季時機與備貨量建議？",
+        "ai_examples": "快速提問：",
+        "ai_q1_btn": "🎯 今年秋裝換季分析",
+        "ai_q1": "今年秋裝換季比往年提早還是延後？建議重點備貨哪些品類？",
+        "ai_q2_btn": "📦 冬季商品策略",
+        "ai_q2": "請根據目前氣候走勢，預測今年冬裝主推時機，以及重磅保暖服飾的庫存配置。",
+        "ai_send": "開始分析",
+        "ai_thinking": "AI 顧問分析中…",
         "ai_unavailable": "尚未設定 GEMINI_API_KEY。請在 .streamlit/secrets.toml 加入 GEMINI_API_KEY = \"你的金鑰\" 後重新啟動。",
         "ai_error": "AI 回覆失敗：{e}",
-        "ai_context": "你是台灣服飾業的天氣分析助理。只能根據下方資料回答，使用繁體中文，簡潔、具體；若資料不足請直說。",
-        "load_error": "無法取得天氣資料：{e}",
-        "loading": "正在取得 Open-Meteo 歷史氣象資料…",
-        "no_data": "資料不足",
-        "month_fmt": "{m}月",
+        "ai_context": "你是資深零售服飾品牌的氣象商業顧問。請只根據下方提供的氣候資料，給出精準、客觀、具商業價值的建議，語氣沉穩專業，使用繁體中文。",
+        "load_error": "氣象資料讀取失敗，請確認網路連線：{e}",
+        "loading": "正在從 Open-Meteo 取得歷史氣象資料…",
+        "no_data": "樣本資料不足",
+        "scroll_hint": "👉 左右滑動查看完整內容",
     },
     "en": {
-        "eyebrow": "TAIWAN WEATHER ANALYTICS",
-        "app_title": "Taiwan Seasonal Weather Analytics",
+        "live": "LIVE CLIMATE DATA",
         "data_until": "Data through {d}",
-        "source": "Source: Open-Meteo Historical Weather",
-        "choose_city": "Choose city",
-        "language": "語言 / Language",
-        "north": "North", "central": "Central", "south": "South", "east": "East",
-        "hero_desc": "Uses 3 years of daily temperature and rainfall to find the seasonal rhythm and compare this year with past years, to guide merchandise launches and campaign planning.",
-        "kpi_temp": "30-DAY AVG TEMP",
-        "kpi_rain": "30-DAY RAINFALL",
-        "kpi_days": "30-DAY RAINY DAYS",
+        "choose_city": "Select city",
+        "north": "Northern Region", "central": "Central Region", "south": "Southern Region", "east": "Eastern Region",
+        "base_period": "Analysis period {a}–{b}",
+        "hero_desc": "Three years of daily temperature and rainfall used to find the seasonal rhythm and year-over-year shifts, as a quantitative basis for apparel launches, stocking, campaign timing and inventory allocation.",
+        "progress_title": "This year's season progress",
+        "kpi_temp": "30-Day Mean Temp",
+        "kpi_rain": "30-Day Rainfall",
+        "kpi_days": "30-Day Rainy Days",
         "vs_last": "Last year {v}",
-        "rain_def": "(daily rain ≥1mm)",
+        "rain_def": "daily rain ≥ 1mm",
         "day_unit": " days",
-        "next_signal": "NEXT SEASON SIGNAL",
+        "warm_tag": "warmer", "cool_tag": "cooler", "flat_tag": "flat", "wet_tag": "wetter", "dry_tag": "drier",
+        "next_signal": "Next seasonal action",
+        "focus_label": "Focus",
         "est_line": "Est. {d} · in ~{n} days",
         "est_soon": "Est. {d} · imminent",
         "all_done": "All signals have occurred this year",
-        "spring": "Spring launch", "summer": "Summer push", "autumn": "Autumn launch", "winter": "Winter push",
-        "spring_items": "Light long sleeves, shirts, light jackets",
-        "summer_items": "Tees, shorts, cooling fabrics",
-        "autumn_items": "Long sleeves, knits, light outerwear",
-        "winter_items": "Coats, sweaters, thermal wear",
-        "rule_up": "7-day avg ≥ {t}°C",
-        "rule_down": "7-day avg < {t}°C",
-        "ins_similar": "Similar to last year",
-        "ins_similar_body": "The 30-day mean differs by only {d}°C, so last year's launch timing can be reused.",
-        "ins_warmer": "Warmer than last year",
-        "ins_warmer_body": "The 30-day mean is {d}°C higher than last year; consider launching light items earlier.",
-        "ins_cooler": "Cooler than last year",
-        "ins_cooler_body": "The 30-day mean is {d}°C lower than last year; consider stocking warm items earlier.",
-        "ins_signal": "Latest signal: {s}",
-        "ins_signal_body": "Appeared on {d} this year; historical average {a}. Push: {items}.",
-        "ins_signal_none": "No signal yet this year",
-        "ins_signal_none_body": "This year's seasonal signals have not appeared yet. Keep watching the 7-day mean.",
-        "ins_wet": "{m} is the wettest",
-        "ins_wet_body": "Average monthly rainfall is about {x}mm — plan outerwear, rain shoes and quick-dry items.",
+        "spring": "Spring Launch", "summer": "Summer Push", "autumn": "Autumn Launch", "winter": "Winter Push",
+        "spring_items": "Light long sleeves, shirts, windbreakers",
+        "summer_items": "T-shirts, shorts, cooling apparel",
+        "autumn_items": "Long sleeves, knits, light jackets",
+        "winter_items": "Coats, knitwear, down jackets, thermals",
+        "rule_up": "7-day mean ≥ {t}°C",
+        "rule_down": "7-day mean < {t}°C",
+        "insights_title": "Executive insights",
+        "tag_plan": "CAMPAIGN PLAN", "tag_shift": "LAUNCH EARLIER", "tag_stock": "STOCK EARLIER",
+        "tag_season": "CURRENT SEASON", "tag_rain": "RAIN GEAR", "tag_extreme": "TEMP EXTREMES",
+        "ins_similar": "Same rhythm as last year",
+        "ins_similar_body": "The 30-day mean differs by only {d}°C. The rhythm is stable — keep last year's merchandising and campaign schedule, no need to discount early.",
+        "ins_warmer": "Warmer than last year: launch light items earlier",
+        "ins_warmer_body": "The 30-day mean is {d}°C above last year and warming faster. Move lightweight, breathable items onto the floor 1–2 weeks earlier.",
+        "ins_cooler": "Cooler than last year: stock warm layers earlier",
+        "ins_cooler_body": "The 30-day mean is {d}°C below last year. Warehouse coats, windbreakers and thermals early and schedule their feature window.",
+        "ins_signal": "Latest triggered: {s}",
+        "ins_signal_body": "Reached on {d} this year (historical average {a}). Focus categories: {items}.",
+        "ins_signal_none": "No new signal yet",
+        "ins_signal_none_body": "This year's seasonal threshold has not triggered. Keep watching the 7-day mean.",
+        "ins_wet": "Rainfall peak: {m} is wettest",
+        "ins_wet_body": "Average monthly rainfall is about {x}mm, the highest of the year. Push water-repellent jackets, non-slip shoes and quick-dry items.",
         "ins_hot_cold": "Hottest {h} · Coldest {c}",
-        "ins_hot_cold_body": "Mean temperatures of about {a}°C and {b}°C — time cooling and thermal inventory peaks accordingly.",
-        "sec1": "LONG-TERM TREND",
-        "sec1_title": "Weekly temperature & rainfall",
-        "sec1_sub": "Explore temperature and rainfall trends across years.",
-        "rng_all": "All", "rng_1y": "Last 1 yr", "rng_6m": "Last 6 mo",
-        "temp_axis": "Temperature (°C)", "rain_axis": "Weekly rain mm)",
-        "week_start": "Week of {d}",
-        "wk_avg": "Weekly mean", "wk_range": "Min–Max", "wk_rain": "Weekly rain",
-        "sec2": "YEAR OVER YEAR",
-        "sec2_title": "Same-month comparison",
-        "sec2_sub": "Is this year warmer, cooler or wetter?",
-        "m_temp": "Temp", "m_rain": "Rain", "m_days": "Rainy days",
-        "note_temp": "Monthly mean (°C) · months with <20 days of data hidden",
-        "note_rain": "Monthly rainfall (mm) · months with <20 days of data hidden",
-        "note_days": "Rainy days · months with <20 days of data hidden",
+        "ins_hot_cold_body": "Monthly means peak at {a}°C and bottom at {b}°C. Use these as the benchmark for cooling and heavy-warmth inventory timing.",
+        "sec1": "01 · CLIMATE TREND",
+        "sec1_title": "Weekly temperature range & rainfall",
+        "sec1_sub": "Top: weekly min–max and mean temperature. Bottom: weekly cumulative rainfall.",
+        "rng_all": "All years", "rng_1y": "Last 1 year", "rng_6m": "Last 6 months",
+        "temp_axis": "Temperature (°C)", "rain_axis": "Weekly rain (mm)",
+        "wk_avg": "Weekly mean", "wk_range": "Weekly range", "wk_rain": "Weekly rain",
+        "wk_max": "Weekly high", "wk_min": "Weekly low",
+        "sec2": "02 · YEAR-OVER-YEAR",
+        "sec2_title": "Same-month comparison across years",
+        "sec2_sub": "See at a glance whether this year runs warmer, cooler or wetter than past years.",
+        "m_temp": "Temp", "m_rain": "Rainfall", "m_days": "Rainy days",
+        "note_temp": "Monthly mean (°C) · months with <20 days of data are hidden",
+        "note_rain": "Monthly rainfall (mm) · months with <20 days of data are hidden",
+        "note_days": "Rainy days per month · a rainy day is ≥ 1mm",
         "year_suffix": "",
-        "sec3": "SEASON TIMING",
+        "sec3": "03 · SEASON TIMING",
         "sec3_title": "Season-signal timeline",
-        "sec3_sub": "The first date the 7-day mean temperature crosses a threshold is the season signal; compare early/late years and estimate this year.",
+        "sec3_sub": "The first day the 7-day mean crosses a threshold is the season signal. Compare early vs late years and estimate this year.",
         "est_legend": "This year (est.)",
-        "season": "Signal",
+        "season": "Milestone",
         "hist_avg": "Hist. avg",
+        "status": "Status",
+        "status_reached": "Reached", "status_proj": "Projected",
         "not_reached": "Not yet",
-        "this_year_found": "Occurred this year",
+        "this_year_found": "Triggered this year",
         "est_label": "Est.",
         "days_after": "in {n} days",
-        "today": "Data end",
-        "sec4": "MERCHANDISE PLANNING",
-        "sec4_title": "Clothing temperature bands",
-        "sec4_sub": "Share of days in each month falling into each band (3-year total) — a guide for monthly product mix.",
+        "today": "Data cutoff",
+        "sec4": "04 · MERCHANDISE PLANNING",
+        "sec4_title": "Monthly clothing temperature bands",
+        "sec4_sub": "Share of days in each month that fall into each temperature band (3-year total) — a guide for the monthly product mix.",
+        "band_header": "Band / suggested categories",
         "hot": "Hot ≥28°C", "warm": "Warm 24–28°C", "comf": "Comfortable 20–24°C",
         "cool": "Cool 16–20°C", "cold": "Cold <16°C",
-        "hot_items": "Tanks, tees, cooling wear", "warm_items": "Tees, light shirts",
-        "comf_items": "Light long sleeves, knits", "cool_items": "Jackets, sweatshirts", "cold_items": "Coats, down, thermals",
-        "footnote": "Temperature is daily 2 m air temperature (ERA5 reanalysis); a rainy day is daily rainfall ≥ 1mm. A season signal is the first day the 7-day mean crosses the threshold with at least 5 of the next 7 days staying on the same side.",
+        "hot_items": "Tanks, tees, cooling wear", "warm_items": "Short-sleeve shirts, light pants",
+        "comf_items": "Light long sleeves, knits, slacks", "cool_items": "Jackets, hoodies, light outerwear",
+        "cold_items": "Coats, down jackets, thermals",
+        "footnote": "Methodology: temperature is ECMWF ERA5 2 m reanalysis; a rainy day is rainfall ≥ 1mm. A season signal is the first day the 7-day mean crosses the threshold, with at least 5 of the next 7 days staying on the same side.",
         "ask_ai": "Ask Weather AI",
-        "ai_title": "Ask Weather AI",
-        "ai_placeholder": "e.g. Will autumn launch be earlier than last year?",
-        "ai_send": "Send",
-        "ai_thinking": "Thinking…",
+        "ai_title": "Retail Climate AI Advisor",
+        "ai_hint": "Ask an operations question. The AI answers from the temperature, rainfall and season-threshold data.",
+        "ai_placeholder": "e.g. When should we start the autumn launch and how much should we stock?",
+        "ai_examples": "Quick questions:",
+        "ai_q1_btn": "🎯 Autumn launch timing",
+        "ai_q1": "Is this year's autumn transition earlier or later than usual? Which categories should we stock?",
+        "ai_q2_btn": "📦 Winter strategy",
+        "ai_q2": "Based on the current trend, when should the winter push start and how should heavy-warmth inventory be allocated?",
+        "ai_send": "Analyze",
+        "ai_thinking": "Analyzing…",
         "ai_unavailable": "GEMINI_API_KEY is not set. Add GEMINI_API_KEY = \"your-key\" to .streamlit/secrets.toml and restart.",
-        "ai_error": "AI reply failed: {e}",
-        "ai_context": "You are a weather analysis assistant for a Taiwan apparel business. Answer ONLY from the data below, in English, concisely and concretely; say so if data is insufficient.",
-        "load_error": "Could not load weather data: {e}",
-        "loading": "Fetching Open-Meteo historical weather…",
-        "no_data": "Not enough data",
-        "month_fmt": "",
+        "ai_error": "AI error: {e}",
+        "ai_context": "You are a senior retail apparel climate advisor. Answer strictly from the data below with concise, strategic, commercially useful advice, in English.",
+        "load_error": "Failed to load weather data: {e}",
+        "loading": "Fetching historical weather from Open-Meteo…",
+        "no_data": "Insufficient data",
+        "scroll_hint": "👉 Scroll sideways to see everything",
     },
 }
 MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -245,7 +278,7 @@ def esc(x) -> str:
 
 
 # =============================================================================
-# 資料
+# 資料與計算
 # =============================================================================
 @st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
 def fetch_weather(city: str, start_iso: str, end_iso: str) -> pd.DataFrame:
@@ -271,9 +304,6 @@ def fetch_weather(city: str, start_iso: str, end_iso: str) -> pd.DataFrame:
     return df
 
 
-# =============================================================================
-# 分析
-# =============================================================================
 def last30_metrics(df: pd.DataFrame) -> dict:
     end = df["date"].max()
     start = end - pd.Timedelta(days=29)
@@ -327,7 +357,7 @@ def find_signal(s7: pd.Series, year: int, thr: float, direction: str, start_md):
         nxt = vals[i + 1:i + 8]
         if len(nxt) >= 7:
             ok = nxt.sum() >= 5
-        else:  # 資料尾端：寬鬆判斷
+        else:
             ok = len(nxt) >= 3 and nxt.sum() >= int(np.ceil(len(nxt) * 5 / 7))
         if ok:
             return seg.index[i]
@@ -353,102 +383,224 @@ def temperature_bands(df: pd.DataFrame) -> pd.DataFrame:
     d["month"] = d.date.dt.month
     d["band"] = pd.cut(d.tmean, [-np.inf, 16, 20, 24, 28, np.inf],
                        labels=["cold", "cool", "comf", "warm", "hot"], right=False)
-    ct = pd.crosstab(d.month, d.band).reindex(index=range(1, 13), columns=["hot", "warm", "comf", "cool", "cold"]).fillna(0)
+    ct = pd.crosstab(d.month, d.band).reindex(
+        index=range(1, 13), columns=["hot", "warm", "comf", "cool", "cold"]).fillna(0)
     total = ct.sum(axis=1).replace(0, np.nan)
     return ct.div(total, axis=0) * 100
 
 
+def mlabel(m: int, lang: str) -> str:
+    return f"{m}月" if lang == "zh" else MONTHS_EN[m - 1]
+
+
+def hex_rgb(c: str):
+    return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
+
+
 # =============================================================================
-# 版面 / 樣式
+# 樣式（字級已整體放大、間距收緊）
 # =============================================================================
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700;900&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-html, body, [class*="css"], .stApp { font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; color: #1C2434; }
-.stApp { background: #FDF8F3; }
-header[data-testid="stHeader"] { background: transparent; }
-.block-container { padding-top: 1.6rem; padding-bottom: 5rem; max-width: 1180px; }
-.eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #8A8F9A; text-transform: uppercase; }
-.serif { font-family: 'Noto Serif TC', 'PMingLiU', serif; }
-.brand-title { font-family: 'Noto Serif TC', serif; font-size: 26px; font-weight: 700; margin-top: 2px; }
-.meta { text-align: right; font-size: 12px; color: #6B7280; line-height: 1.5; }
-.meta b { font-family: 'JetBrains Mono', monospace; color: #1C2434; }
-.hero-region { margin-top: 26px; }
-.hero-city { font-family: 'Noto Serif TC', serif; font-size: 58px; font-weight: 900; line-height: 1.15; margin: 4px 0 8px; }
-.hero-desc { max-width: 560px; color: #4B5563; font-size: 15px; line-height: 1.7; }
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); margin: 24px 0 14px; border: 1px solid #EADFD3; border-radius: 16px; overflow: hidden; background: #fff; }
-.kpi { padding: 18px 22px; border-right: 1px solid #EADFD3; }
-.kpi .big { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 700; margin: 6px 0 2px; }
-.kpi .big small { font-size: 16px; font-weight: 500; margin-left: 2px; }
-.kpi .sub { font-size: 12.5px; color: #6B7280; }
-.kpi .up { color: #DA784C; font-family: 'JetBrains Mono', monospace; }
-.kpi.dark { background: #1C2434; color: #fff; border-right: none; }
-.kpi.dark .eyebrow { color: #AEB6C4; }
-.kpi.dark .name { font-family: 'Noto Serif TC', serif; font-size: 26px; font-weight: 700; margin: 8px 0 4px; }
-.kpi.dark .sub { color: #D5DAE3; }
-.kpi.dark .items { font-size: 12px; color: #AEB6C4; margin-top: 4px; }
-.ins-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
-.ins { background: #FDF1E8; border: 1px solid #F3DCCB; border-radius: 14px; padding: 14px 16px; }
-.ins .ic { color: #DA784C; font-size: 15px; }
-.ins .tt { font-weight: 700; font-size: 15px; margin: 6px 0 4px; }
-.ins .bd { font-size: 12.5px; color: #4B5563; line-height: 1.6; }
-[class*="st-key-sec"] { background: #fff; border: 1px solid #EADFD3; border-radius: 18px; padding: 22px 24px 14px; margin-bottom: 20px; }
-.sec-title { font-family: 'Noto Serif TC', serif; font-size: 25px; font-weight: 700; margin: 2px 0 2px; }
-.sec-sub { font-size: 13px; color: #6B7280; margin-bottom: 6px; }
-.note-right { text-align: right; font-size: 12px; color: #6B7280; }
-.season-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
-.season-table th { text-align: left; font-weight: 500; color: #6B7280; padding: 9px 6px; border-bottom: 1px solid #EEE5DB; }
-.season-table td { padding: 10px 6px; border-bottom: 1px solid #F3ECE4; font-family: 'JetBrains Mono', monospace; }
-.season-table td:first-child { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; }
-.season-table td.avg { font-weight: 700; }
-.heat { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; margin-top: 6px; }
-.heat th { font-size: 11px; font-weight: 400; color: #8A8F9A; text-align: center; padding-bottom: 2px; }
-.heat td.cell { height: 40px; border-radius: 8px; text-align: center; font-size: 11px; font-weight: 700; color: #1C2434; }
-.heat td.lab { width: 150px; text-align: left; padding-right: 8px; }
-.heat .bn { font-size: 13px; font-weight: 700; }
-.heat .bi { font-size: 11px; color: #8A8F9A; }
-.footnote { font-size: 12px; color: #8A8F9A; margin: 4px 0 24px; }
-.st-key-ai_float { position: fixed; right: 24px; bottom: 24px; z-index: 1000; width: auto !important; }
-.st-key-ai_float button { background: #1C2434; color: #fff; border-radius: 999px; border: none; padding: 10px 18px; font-weight: 700; }
-.st-key-ai_float button:hover { background: #2F4568; color: #fff; }
-[data-testid="stPopoverBody"] { min-width: 380px; }
-@media (max-width: 900px) {
-  .kpi-row, .ins-row { grid-template-columns: 1fr 1fr; }
-  .hero-city { font-size: 42px; }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans TC', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --bg-page: #EEF2F7;
+  --bg-surface: #FFFFFF;
+  --accent: #E05D38;
+  --border: #D5DDE8;
+  --shadow: 0 6px 22px -4px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.04);
+  --shadow-hover: 0 14px 30px -6px rgba(15,23,42,.14);
+}
+html, body, [class*="css"], .stApp {
+  font-family: var(--font-sans);
+  color: #0F172A;
+  background: var(--bg-page);
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+}
+header[data-testid="stHeader"] { background: transparent !important; }
+.block-container { padding: 1.2rem 2.2rem 5rem !important; max-width: 1500px !important; }
+
+/* 導覽列 */
+.exec-nav-bar {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  border-radius: 18px; padding: 18px 26px;
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  box-shadow: 0 10px 28px -6px rgba(15,23,42,.35);
+}
+.exec-left { display: flex; align-items: center; gap: 16px; }
+.exec-logo { font-size: 32px; line-height: 1; }
+.exec-sub { font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; color: #FF9A78; font-weight: 700; }
+.exec-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -.01em; margin-top: 2px; }
+.exec-live {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #A7F3D0;
+  background: rgba(16,185,129,.14); border: 1px solid rgba(16,185,129,.4);
+  padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+}
+
+/* Hero */
+.hero-box {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 22px;
+  padding: 30px 34px; box-shadow: var(--shadow); margin: 16px 0 18px;
+}
+.hero-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 34px; align-items: stretch; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.badge-primary { background: #FFF1EA; color: #C2410C; border: 1px solid #FDBA74; padding: 6px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 700; }
+.badge-neutral { background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 600; }
+.hero-city-title { font-size: clamp(3rem, 5.4vw, 4.8rem); font-weight: 900; letter-spacing: -.035em; line-height: 1.08; margin: 8px 0 14px; }
+.hero-summary-text { font-size: 18px; color: #334155; line-height: 1.75; max-width: 780px; }
+
+.prog-panel { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px 22px; }
+.prog-title { font-size: 14px; font-weight: 800; letter-spacing: .08em; color: #64748B; text-transform: uppercase; margin-bottom: 8px; }
+.prog-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px dashed #D5DDE8; }
+.prog-row:last-child { border-bottom: none; }
+.prog-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 14px; background: #CBD5E1; }
+.prog-row.ok .prog-dot { background: #10B981; box-shadow: 0 0 0 4px rgba(16,185,129,.18); }
+.prog-row.wait .prog-dot { background: #fff; border: 3px solid var(--accent); }
+.prog-name { flex: 1; font-size: 18px; font-weight: 800; }
+.prog-name small { display: block; font-size: 13.5px; font-weight: 600; color: #64748B; margin-top: 1px; }
+.prog-date { font-family: var(--font-mono); font-size: 22px; font-weight: 800; }
+.prog-row.ok .prog-date { color: var(--accent); }
+
+/* KPI */
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin: 0 0 22px; }
+.kpi {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 22px 26px; box-shadow: var(--shadow); transition: transform .2s, box-shadow .2s;
+}
+.kpi:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+.kpi-top { display: flex; justify-content: space-between; align-items: center; }
+.kpi-label { font-size: 14px; font-weight: 800; color: #64748B; letter-spacing: .04em; }
+.kpi-icon { font-size: 22px; }
+.kpi .big { font-family: var(--font-mono); font-size: clamp(44px, 4.4vw, 62px); font-weight: 800; letter-spacing: -.04em; line-height: 1; margin: 14px 0 12px; font-variant-numeric: tabular-nums; }
+.kpi .big small { font-size: 22px; font-weight: 700; margin-left: 4px; color: #64748B; letter-spacing: 0; }
+.kpi .sub { font-size: 15px; color: #475569; line-height: 1.6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.pill { font-family: var(--font-mono); font-size: 13.5px; font-weight: 800; padding: 3px 10px; border-radius: 7px; }
+.pill-warm { background: #FFF1E6; color: #C2410C; }
+.pill-cool { background: #E0F0FF; color: #1D4ED8; }
+.pill-flat { background: #EEF2F7; color: #475569; }
+.kpi.dark { background: linear-gradient(135deg, #0F172A 0%, #243349 100%); border: 1px solid rgba(251,191,36,.5); color: #fff; }
+.kpi.dark .kpi-label { color: #FBBF24; }
+.kpi.dark .name { font-size: 34px; font-weight: 900; letter-spacing: -.02em; margin: 12px 0 10px; }
+.kpi.dark .badge { display: inline-block; background: rgba(251,191,36,.18); color: #FDE68A; border: 1px solid rgba(251,191,36,.5); font-size: 14.5px; font-weight: 700; padding: 5px 12px; border-radius: 8px; }
+.kpi.dark .items { font-size: 15px; color: #E2E8F0; line-height: 1.6; border-top: 1px solid rgba(255,255,255,.14); padding-top: 11px; margin-top: 14px; }
+
+/* 摘要卡 */
+.ins-title { font-size: 22px; font-weight: 800; margin: 6px 0 14px; display: flex; align-items: center; gap: 10px; }
+.ins-title::before { content: ""; width: 6px; height: 24px; background: var(--accent); border-radius: 3px; }
+.ins-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 26px; }
+.ins { background: var(--bg-surface); border: 1px solid var(--border); border-top: 4px solid #0F172A; border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
+.ins-tag { font-family: var(--font-mono); font-size: 12.5px; font-weight: 800; color: var(--accent); letter-spacing: .08em; margin-bottom: 8px; }
+.ins .tt { font-size: 18.5px; font-weight: 800; line-height: 1.4; margin-bottom: 8px; }
+.ins .bd { font-size: 15.5px; color: #475569; line-height: 1.75; }
+
+/* 分析區塊 */
+[class*="st-key-sec"] { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 22px; padding: 28px 32px 24px; margin-bottom: 24px; box-shadow: var(--shadow); }
+.eyebrow { color: var(--accent); font-weight: 800; font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; }
+.sec-title { font-size: clamp(26px, 2.4vw, 32px); font-weight: 800; letter-spacing: -.02em; margin: 4px 0 6px; }
+.sec-sub { font-size: 16.5px; color: #475569; line-height: 1.6; margin-bottom: 8px; }
+.note-right { text-align: right; font-size: 14px; color: #64748B; margin-top: 8px; font-weight: 500; }
+
+/* 規則卡 */
+.rule-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 10px 0 18px; }
+.rule-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px 18px; }
+.rule-name { font-size: 18px; font-weight: 800; }
+.rule-cond { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--accent); margin: 3px 0 4px; }
+.rule-items { font-size: 14.5px; color: #64748B; line-height: 1.5; }
+
+/* 表格 */
+.table-scroll { width: 100%; overflow-x: auto; border-radius: 14px; border: 1px solid var(--border); background: #fff; margin-top: 12px; }
+.scroll-hint { display: none; font-size: 14px; color: #475569; background: #F1F5F9; padding: 8px 12px; border-radius: 8px; margin-top: 8px; text-align: center; font-weight: 600; }
+.season-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.season-table th { background: #F8FAFC; color: #334155; font-weight: 800; text-align: left; padding: 15px 20px; border-bottom: 2px solid #CBD5E1; white-space: nowrap; font-size: 15px; }
+.season-table td { padding: 15px 20px; border-bottom: 1px solid #E2E8F0; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; font-size: 16.5px; }
+.season-table tr:hover td { background: #F8FAFC; }
+.season-table td:first-child { font-family: var(--font-sans); font-weight: 800; font-size: 17px; }
+.season-table td.avg { font-weight: 800; color: var(--accent); }
+.tag-ok { background: #DCFCE7; color: #166534; padding: 4px 11px; border-radius: 7px; font-size: 14px; font-weight: 800; font-family: var(--font-sans); }
+.tag-wait { background: #FEF3C7; color: #92400E; padding: 4px 11px; border-radius: 7px; font-size: 14px; font-weight: 800; font-family: var(--font-sans); }
+.tag-none { background: #F1F5F9; color: #64748B; padding: 4px 11px; border-radius: 7px; font-size: 14px; font-family: var(--font-sans); }
+
+/* 熱力圖 */
+.heat { width: 100%; border-collapse: separate; border-spacing: 7px; table-layout: fixed; padding: 12px 14px; min-width: 980px; }
+.heat th { font-size: 15px; font-weight: 800; color: #334155; text-align: center; padding-bottom: 6px; }
+.heat th:first-child { width: 240px; text-align: left; }
+.heat td.lab { width: 240px; text-align: left; padding-right: 12px; }
+.heat .bn { font-size: 17px; font-weight: 800; }
+.heat .bi { font-size: 13.5px; color: #64748B; margin-top: 2px; line-height: 1.4; }
+.heat td.cell { height: 58px; border-radius: 10px; text-align: center; font-size: 15.5px; font-weight: 800; font-family: var(--font-mono); border: 1px solid rgba(0,0,0,.04); }
+
+.footnote { font-size: 14px; color: #64748B; margin: 8px 4px 40px; line-height: 1.8; }
+
+/* Streamlit 元件 */
+div[data-testid="stSelectbox"] > div { border-radius: 12px !important; border-color: #CBD5E1 !important; background: #fff !important; }
+div[data-testid="stSelectbox"] div[data-baseweb="select"] { font-size: 16px !important; min-height: 48px; }
+div[data-testid="stSegmentedControl"] button, div[data-testid="stRadio"] label { font-size: 15.5px !important; font-weight: 700 !important; }
+button[data-testid="stBaseButton-segmented_controlActive"] { background: #0F172A !important; color: #fff !important; }
+button[data-testid="stBaseButton-segmented_controlActive"] p { color: #fff !important; }
+
+.st-key-ai_float { position: fixed; right: 30px; bottom: 30px; z-index: 9999; width: auto !important; }
+.st-key-ai_float button { background: #0F172A !important; color: #fff !important; border-radius: 999px !important; border: 1px solid rgba(255,255,255,.2) !important; padding: 14px 28px !important; font-weight: 800 !important; font-size: 16px !important; box-shadow: 0 12px 28px -4px rgba(15,23,42,.45) !important; }
+.st-key-ai_float button p { color: #fff !important; font-size: 16px !important; }
+[data-testid="stPopoverBody"] { min-width: 420px !important; border-radius: 18px !important; }
+
+@media (max-width: 1100px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .kpi-row, .ins-row, .rule-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 680px) {
+  .block-container { padding: 1rem 1rem 5rem !important; }
+  .exec-nav-bar { flex-direction: column; align-items: flex-start; }
+  .kpi-row, .ins-row, .rule-grid { grid-template-columns: 1fr; }
+  [class*="st-key-sec"] { padding: 20px 16px; }
+  .season-table { min-width: 620px; }
+  .scroll-hint { display: block; }
+  [data-testid="stPopoverBody"] { min-width: 300px !important; }
 }
 </style>
 """
 
 
+# =============================================================================
+# 圖表
+# =============================================================================
+FONT = "Plus Jakarta Sans, Noto Sans TC, sans-serif"
+
+
 def plotly_show(fig: go.Figure) -> None:
-    cfg = {"displayModeBar": False}
+    cfg = {"displayModeBar": False, "responsive": True}
     try:
         st.plotly_chart(fig, width="stretch", config=cfg)
-    except TypeError:  # 舊版 Streamlit
+    except TypeError:
         st.plotly_chart(fig, use_container_width=True, config=cfg)
 
 
 def style_fig(fig: go.Figure, height: int) -> None:
     fig.update_layout(
-        height=height, margin=dict(l=10, r=10, t=30, b=10),
+        height=height, autosize=True,
+        margin=dict(l=70, r=30, t=40, b=30),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Noto Sans TC, Microsoft JhengHei, sans-serif", size=12, color="#4B5563"),
-        legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.12),
-        hoverlabel=dict(bgcolor="white", font_size=12),
+        font=dict(family=FONT, size=15, color="#334155"),
+        legend=dict(orientation="h", x=0, xanchor="left", y=-0.14,
+                    font=dict(size=15, color="#1E293B", family=FONT)),
+        hoverlabel=dict(bgcolor="#FFFFFF", font_size=15, font_family=FONT, bordercolor="#CBD5E1"),
     )
-    fig.update_xaxes(showgrid=False, linecolor="#E5E7EB", tickfont=dict(size=11, color="#8A8F9A"))
-    fig.update_yaxes(gridcolor="#F1ECE6", zeroline=False, tickfont=dict(size=11, color="#8A8F9A"))
+    fig.update_xaxes(showgrid=False, linecolor="#CBD5E1", tickfont=dict(size=14, color="#475569"))
+    fig.update_yaxes(gridcolor="#EDF1F6", zeroline=False, tickfont=dict(size=14, color="#475569"),
+                     title_font=dict(size=15, color="#475569"))
 
 
 def section_header(eyebrow: str, title: str, sub: str) -> None:
     st.markdown(
-        f'<div class="eyebrow">{esc(eyebrow)}</div><div class="sec-title">{esc(title)}</div>'
-        f'<div class="sec-sub">{esc(sub)}</div>', unsafe_allow_html=True)
+        f'<div class="eyebrow">{esc(eyebrow)}</div>'
+        f'<div class="sec-title">{esc(title)}</div>'
+        f'<div class="sec-sub">{esc(sub)}</div>',
+        unsafe_allow_html=True)
 
 
-# =============================================================================
-# 圖表
-# =============================================================================
 def plot_weekly(df: pd.DataFrame, rng: str, t) -> None:
     d = df
     if rng == "1y":
@@ -458,56 +610,62 @@ def plot_weekly(df: pd.DataFrame, rng: str, t) -> None:
     w = d.set_index("date").resample("7D").agg(
         tmean=("tmean", "mean"), tmax=("tmax", "max"), tmin=("tmin", "min"), rain=("rain", "sum")
     ).reset_index()
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(x=w.date, y=w.rain, marker_color="rgba(122,170,205,0.55)", name=t("wk_rain"),
-                         hoverinfo="skip", showlegend=True), secondary_y=True)
-    fig.add_trace(go.Scatter(x=w.date, y=w.tmin, mode="lines", line=dict(width=0), hoverinfo="skip",
-                             showlegend=False), secondary_y=False)
-    fig.add_trace(go.Scatter(x=w.date, y=w.tmax, mode="lines", line=dict(width=0), fill="tonexty",
-                             fillcolor="rgba(218,120,76,0.14)",  name=t("wk_range"),hoverinfo="skip", showlegend=True),
-                  secondary_y=False)
-    cd = np.stack([w.tmin, w.tmax, w.rain], axis=-1)
+
+    # 上下兩個面板：上＝氣溫，下＝雨量（各自獨立刻度，不再互相擠壓）
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.68, 0.32], vertical_spacing=0.08)
     fig.add_trace(go.Scatter(
-        x=w.date, y=w.tmean, mode="lines", line=dict(color=ACCENT, width=2.4), name=t("wk_avg"),
-        customdata=cd, showlegend=True,
-        hovertemplate=("<b>%{x|%Y-%m-%d}</b><br>" + t("wk_avg") + ": %{y:.1f}°C<br>"
-                       + t("wk_range") + ": %{customdata[0]:.1f}~%{customdata[1]:.1f}°C<br>"
-                       + t("wk_rain") + ": %{customdata[2]:.1f} mm<extra></extra>")), secondary_y=False)
-    style_fig(fig, 380)
-    fig.update_layout(hovermode="x", bargap=0.15)
+        x=w.date, y=w.tmin, mode="lines", line=dict(width=0), showlegend=False,
+        hovertemplate="%{y:.1f}°C<extra>" + t("wk_min") + "</extra>"), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=w.date, y=w.tmax, mode="lines", line=dict(width=0), fill="tonexty",
+        fillcolor="rgba(224,93,56,0.14)", name=t("wk_range"),
+        hovertemplate="%{y:.1f}°C<extra>" + t("wk_max") + "</extra>"), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=w.date, y=w.tmean, mode="lines", line=dict(color=ACCENT, width=3.2), name=t("wk_avg"),
+        hovertemplate="%{y:.1f}°C<extra>" + t("wk_avg") + "</extra>"), row=1, col=1)
+    fig.add_trace(go.Bar(
+        x=w.date, y=w.rain, name=t("wk_rain"),
+        marker=dict(color="rgba(14,165,233,0.55)", line=dict(color="rgba(2,132,199,0.8)", width=0.6)),
+        hovertemplate="%{y:.0f} mm<extra>" + t("wk_rain") + "</extra>"), row=2, col=1)
+
+    style_fig(fig, 520)
+    fig.update_layout(hovermode="x unified", bargap=0.2, margin=dict(l=70, r=30, t=60, b=30),
+                      legend=dict(orientation="h", x=0, y=1.1, font=dict(size=15)))
     tmin, tmax = float(w.tmin.min()), float(w.tmax.max())
-    fig.update_yaxes(range=[np.floor(tmin) - 2, np.ceil(tmax) + 2], title_text=t("temp_axis"), secondary_y=False)
-    fig.update_yaxes(range=[0, max(50.0, float(w.rain.max()) * 2.0)], title_text=t("rain_axis"),
-                     showgrid=False, secondary_y=True)
+    fig.update_yaxes(range=[np.floor(tmin) - 2, np.ceil(tmax) + 2], title_text=t("temp_axis"), row=1, col=1)
+    fig.update_yaxes(range=[0, max(30.0, float(w.rain.max()) * 1.1)], title_text=t("rain_axis"), row=2, col=1)
     plotly_show(fig)
 
 
 def plot_monthly(monthly: pd.DataFrame, years: list[int], metric: str, lang: str, t) -> None:
     col = {"temp": "temp", "rain": "rain", "days": "days"}[metric]
+    unit = {"temp": "°C", "rain": " mm", "days": " " + t("day_unit").strip()}[metric]
     fig = go.Figure()
-    unit = {"temp": "°C", "rain": " mm", "days": ""}[metric]
+    xs = [mlabel(m, lang) for m in range(1, 13)]
     for i, y in enumerate(years):
         cur = monthly[monthly.year == y].set_index("month").reindex(range(1, 13))
         ys = cur[col].to_numpy()
         name = f"{y}{t('year_suffix')}"
-        hover = f"{name} · %{{x}}<br>%{{y:.1f}}{unit}<extra></extra>" if metric != "days" else \
-            f"{name} · %{{x}}<br>%{{y:.0f}}<extra></extra>"
+        fmt = ".1f" if metric != "days" else ".0f"
+        hover = f"%{{y:{fmt}}}{unit}<extra>{name}</extra>"
         color = YEAR_COLORS[i]
-        xs = [mlabel(m, lang) for m in range(1, 13)]
         if metric == "temp":
             last = (y == years[-1])
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, name=name, mode="lines+markers" if last else "lines", line_shape="spline",
-                line=dict(color=color, width=3.2 if last else 2),
-                marker=dict(size=7, color="white", line=dict(width=2, color=color)),
+                line=dict(color=color, width=4 if last else 2.4),
+                marker=dict(size=9, color="#FFFFFF", line=dict(width=3, color=color)),
                 connectgaps=False, hovertemplate=hover))
         else:
-            fig.add_trace(go.Bar(x=xs, y=ys, name=name, marker_color=color, hovertemplate=hover))
-    style_fig(fig, 380)
-    fig.update_layout(barmode="group", bargap=0.22, hovermode="x unified" if metric == "temp" else "closest")
-    fig.update_xaxes(categoryorder="array", categoryarray=[mlabel(m, lang) for m in range(1, 13)])
-    if metric == "temp":
-        fig.update_yaxes(rangemode="normal")
+            fig.add_trace(go.Bar(x=xs, y=ys, name=name,
+                                 marker=dict(color=color, line=dict(color="#FFFFFF", width=1)),
+                                 hovertemplate=hover))
+    style_fig(fig, 470)
+    fig.update_layout(barmode="group", bargap=0.22, hovermode="x unified",
+                      legend=dict(orientation="h", x=0, y=1.1, font=dict(size=15)),
+                      margin=dict(l=70, r=30, t=60, b=30))
+    fig.update_xaxes(categoryorder="array", categoryarray=xs)
+    fig.update_yaxes(title_text=t("note_" + metric).split(" · ")[0])
     plotly_show(fig)
 
 
@@ -516,9 +674,9 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
     row_y = {k: len(keys) - 1 - i for i, k in enumerate(keys)}
     fig = go.Figure()
     for k, y in row_y.items():
-        fig.add_shape(type="rect", x0=1, x1=366, y0=y - 0.3, y1=y + 0.3, fillcolor="#F8F3ED",
-                      line_width=0, layer="below")
-    offsets = np.linspace(-0.12, 0.12, len(years))
+        fig.add_shape(type="rect", x0=1, x1=366, y0=y - 0.36, y1=y + 0.36,
+                      fillcolor="#F4F7FB", line=dict(color="#E2E8F0", width=1), layer="below")
+    # 舊年份先畫、今年最後畫（在最上層），同一季節的點放在同一條線上
     for yi, yr in enumerate(years):
         xs, ys, texts = [], [], []
         for k in keys:
@@ -526,52 +684,61 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
             if ts is None:
                 continue
             xs.append(norm_doy(ts))
-            ys.append(row_y[k] + offsets[yi])
+            ys.append(row_y[k])
             texts.append(f"{t(k)}<br>{ts.month}/{ts.day}")
         last = (yr == years[-1])
         fig.add_trace(go.Scatter(
             x=xs, y=ys, mode="markers", name=str(yr), text=texts,
-            marker=dict(size=15 if last else 11, color=YEAR_COLORS[yi], line=dict(color="white", width=1.5)),
-            hovertemplate=f"{yr} · %{{text}}<extra></extra>"))
-    # 今年預估（空心圓）
+            marker=dict(size=22 if last else 16, color=YEAR_COLORS[yi], opacity=0.95,
+                        line=dict(color="#FFFFFF", width=2)),
+            hovertemplate=f"<b>{yr}</b> · %{{text}}<extra></extra>"))
     ex, ey, et = [], [], []
     for k in keys:
         if signals[k].get(years[-1]) is None and summary[k]["avg_md"]:
             m, d = summary[k]["avg_md"]
             ex.append(date(2001, m, d).timetuple().tm_yday)
-            ey.append(row_y[k] + offsets[-1])
+            ey.append(row_y[k])
             et.append(f"{t(k)}<br>{t('est_label')} {m}/{d}")
     if ex:
         fig.add_trace(go.Scatter(
             x=ex, y=ey, mode="markers", name=t("est_legend"), text=et,
-            marker=dict(size=16, color="white", symbol="circle-open", line=dict(color=ACCENT, width=2.4)),
+            marker=dict(size=22, color="#FFFFFF", line=dict(color=ACCENT, width=3.5)),
             hovertemplate="%{text}<extra></extra>"))
-    # 資料截止線
-    fig.add_vline(x=norm_doy(end), line_width=1.2, line_color="#9CA3AF")
-    # 右側日期標註
+    fig.add_vline(x=norm_doy(end), line_width=1.8, line_color="#94A3B8", line_dash="dot",
+                  annotation_text=t("today"), annotation_position="bottom right",
+                  annotation_font=dict(size=13, color="#64748B"))
     for k in keys:
         cur = signals[k].get(years[-1])
         if cur is not None:
-            label, color = f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:11px'>{t('this_year_found')}</span>", ACCENT
+            label = (f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:13px;color:#059669'>"
+                     f"✓ {t('this_year_found')}</span>")
+            color = ACCENT
         elif summary[k]["est"]:
             e = summary[k]["est"]
             n = max(0, (pd.Timestamp(e) - end).days)
-            label, color = f"<b>{e.month}/{e.day}</b><br><span style='font-size:11px'>{t('est_label')} {t('days_after', n=n)}</span>", INK
+            label = (f"<b>{e.month}/{e.day}</b><br><span style='font-size:13px;color:#B45309'>"
+                     f"{t('est_label')} · {t('days_after', n=n)}</span>")
+            color = INK
         else:
-            label, color = f"<b>{t('not_reached')}</b>", "#6B7280"
-        fig.add_annotation(xref="paper", x=1.01, xanchor="left", y=row_y[k], yref="y", text=label,
-                           showarrow=False, font=dict(color=color, size=14), align="left")
-    style_fig(fig, 330)
-    fig.update_layout(margin=dict(l=10, r=130, t=40, b=10), hovermode="closest",
-                      legend=dict(orientation="h", x=0, xanchor="left", y=1.2))
+            label, color = f"<b>{t('not_reached')}</b>", "#94A3B8"
+        fig.add_annotation(xref="paper", x=1.012, xanchor="left", y=row_y[k], yref="y", text=label,
+                           showarrow=False, font=dict(color=color, size=18), align="left")
+    style_fig(fig, 400)
+    fig.update_layout(margin=dict(l=120, r=190, t=50, b=60), hovermode="closest",
+                      legend=dict(orientation="h", x=0, xanchor="left", y=-0.06, font=dict(size=15)))
     fig.update_xaxes(range=[1, 366], tickmode="array",
                      tickvals=[date(2001, m, 1).timetuple().tm_yday for m in range(1, 13)],
-                     ticktext=[mlabel(m, lang) for m in range(1, 13)], showgrid=True, gridcolor="#F4EEE8", side="top")
+                     ticktext=[mlabel(m, lang) for m in range(1, 13)],
+                     showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=14))
     fig.update_yaxes(range=[-0.6, len(keys) - 0.4], tickmode="array", tickvals=[row_y[k] for k in keys],
-                     ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False)
+                     ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False,
+                     tickfont=dict(size=16, color="#0F172A"))
     plotly_show(fig)
 
 
+# =============================================================================
+# HTML 區塊
+# =============================================================================
 def season_rule(key: str, t) -> str:
     for k, thr, direction, _ in SEASONS:
         if k == key:
@@ -579,65 +746,118 @@ def season_rule(key: str, t) -> str:
     return ""
 
 
+def rule_grid_html(t) -> str:
+    h = '<div class="rule-grid">'
+    for k, *_ in SEASONS:
+        h += (f'<div class="rule-card"><div class="rule-name">{esc(t(k))}</div>'
+              f'<div class="rule-cond">{esc(season_rule(k, t))}</div>'
+              f'<div class="rule-items">{esc(t(k + "_items"))}</div></div>')
+    return h + "</div>"
+
+
+def progress_html(signals, summary, years, end, t) -> str:
+    rows = ""
+    for k, *_ in SEASONS:
+        cur = signals[k].get(years[-1])
+        if cur is not None:
+            cls, right, sub = "ok", f"{cur.month}/{cur.day}", t("this_year_found")
+        elif summary[k]["est"]:
+            e = summary[k]["est"]
+            n = max(0, (pd.Timestamp(e) - end).days)
+            cls, right, sub = "wait", f"{e.month}/{e.day}", f"{t('est_label')} · {t('days_after', n=n)}"
+        else:
+            cls, right, sub = "none", "—", t("not_reached")
+        rows += (f'<div class="prog-row {cls}"><span class="prog-dot"></span>'
+                 f'<div class="prog-name">{esc(t(k))}<small>{esc(sub)}</small></div>'
+                 f'<div class="prog-date">{right}</div></div>')
+    return rows
+
+
 def season_table_html(signals, summary, years, lang, t) -> str:
-    head = [t("season")] + [str(y) for y in years] + [t("hist_avg")]
-    h = '<table class="season-table"><thead><tr>' + "".join(f"<th>{esc(x)}</th>" for x in head) + "</tr></thead><tbody>"
+    head = [t("season")] + [f"{y}{t('year_suffix')}" for y in years] + [t("hist_avg"), t("status")]
+    h = ('<table class="season-table"><thead><tr>' + "".join(f"<th>{esc(x)}</th>" for x in head)
+         + "</tr></thead><tbody>")
     for k, *_ in SEASONS:
         h += f"<tr><td>{esc(t(k))}</td>"
         for y in years:
             ts = signals[k].get(y)
-            h += f"<td>{ts.month}/{ts.day}</td>" if ts is not None else f"<td>{esc(t('not_reached'))}</td>"
+            if y == years[-1] and ts is not None:
+                h += f'<td style="background:#FFF4EC;font-weight:800;color:#C2410C;">{ts.month}/{ts.day}</td>'
+            elif ts is not None:
+                h += f"<td>{ts.month}/{ts.day}</td>"
+            else:
+                h += f'<td style="color:#94A3B8;">{esc(t("not_reached"))}</td>'
         avg = summary[k]["avg_md"]
-        h += f'<td class="avg">{avg[0]}/{avg[1]}</td></tr>' if avg else '<td class="avg">—</td></tr>'
+        h += f'<td class="avg">{avg[0]}/{avg[1]}</td>' if avg else '<td class="avg">—</td>'
+        if signals[k].get(years[-1]) is not None:
+            badge = f'<span class="tag-ok">● {esc(t("status_reached"))}</span>'
+        elif summary[k]["est"]:
+            badge = f'<span class="tag-wait">⏱ {esc(t("status_proj"))}</span>'
+        else:
+            badge = '<span class="tag-none">—</span>'
+        h += f"<td>{badge}</td></tr>"
     return h + "</tbody></table>"
-
-
-def hex_rgb(c: str):
-    return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
 
 
 def heatmap_html(df: pd.DataFrame, lang: str, t) -> str:
     pct = temperature_bands(df)
-    h = '<table class="heat"><thead><tr><th></th>' + "".join(f"<th>{esc(mlabel(m, lang))}</th>" for m in range(1, 13)) + "</tr></thead><tbody>"
+    h = ('<table class="heat"><thead><tr><th>' + esc(t("band_header")) + "</th>"
+         + "".join(f"<th>{esc(mlabel(m, lang))}</th>" for m in range(1, 13)) + "</tr></thead><tbody>")
     for key, color in BANDS:
         r, g, b = hex_rgb(color)
-        h += f'<tr><td class="lab"><div class="bn">{esc(t(key))}</div><div class="bi">{esc(t(key + "_items"))}</div></td>'
+        h += (f'<tr><td class="lab"><div class="bn">{esc(t(key))}</div>'
+              f'<div class="bi">{esc(t(key + "_items"))}</div></td>')
         for m in range(1, 13):
             v = pct.loc[m, key]
             if pd.isna(v) or v < 0.5:
-                bg, txt = "rgba(0,0,0,0.045)", ""
-                if not pd.isna(v) and v > 0:
-                    bg = f"rgba({r},{g},{b},0.10)"
+                bg, txt, tc = "#F6F8FB", "—", "#94A3B8"
             else:
-                alpha = min(0.85, 0.12 + v / 100 * 0.75)
-                bg, txt = f"rgba({r},{g},{b},{alpha:.3f})", f"{int(round(v))}%"
-            h += f'<td class="cell" style="background:{bg}">{txt}</td>'
+                alpha = min(0.92, 0.16 + (v / 100) * 0.76)
+                bg = f"rgba({r},{g},{b},{alpha:.3f})"
+                txt = f"{int(round(v))}%"
+                tc = "#FFFFFF" if alpha > 0.5 else "#0F172A"
+            h += f'<td class="cell" style="background:{bg};color:{tc};">{txt}</td>'
         h += "</tr>"
     return h + "</tbody></table>"
 
 
-def mlabel(m: int, lang: str) -> str:
-    return f"{m}月" if lang == "zh" else MONTHS_EN[m - 1]
+def pill(v: float, unit: str, dec: int, up_tag: str, down_tag: str, flat_tag: str) -> str:
+    if v > 0:
+        return f'<span class="pill pill-warm">↗ +{v:.{dec}f}{unit} {up_tag}</span>'
+    if v < 0:
+        return f'<span class="pill pill-cool">↘ {v:.{dec}f}{unit} {down_tag}</span>'
+    return f'<span class="pill pill-flat">→ 0{unit} {flat_tag}</span>'
+
+
+def segmented(label: str, options: list, key: str, fmt):
+    """優先用 Streamlit 新版分段按鈕；舊版自動退回 radio。"""
+    if hasattr(st, "segmented_control"):
+        val = st.segmented_control(label, options, default=options[0], key=key,
+                                   format_func=fmt, label_visibility="collapsed")
+        return val or options[0]
+    return st.radio(label, options, horizontal=True, key=key, format_func=fmt, label_visibility="collapsed")
 
 
 # =============================================================================
 # AI
 # =============================================================================
 def build_ai_context(city: str, metrics: dict, signals, summary, years, monthly) -> str:
-    lines = [f"Location: {CITIES[city][0]} / {city}",
-             f"Latest data day: {metrics['end'].date().isoformat()}",
-             f"Last 30 days: mean temp {metrics['temp']:.1f} C, rainfall {metrics['rain']:.0f} mm, rainy days {metrics['days']}."]
+    lines = [
+        f"Location: {CITIES[city][0]} / {city}",
+        f"Latest observation: {metrics['end'].date().isoformat()}",
+        f"Last 30 days: mean temp {metrics['temp']:.1f} C, rainfall {metrics['rain']:.0f} mm, rainy days {metrics['days']}.",
+    ]
     if metrics["temp_prev"] is not None:
-        lines.append(f"Same window last year: mean temp {metrics['temp_prev']:.1f} C, rainfall {metrics['rain_prev']:.0f} mm, rainy days {metrics['days_prev']}.")
-    lines.append("Rainy day = daily precipitation >= 1 mm. Season signal = first day the 7-day mean temperature crosses the threshold.")
+        lines.append(f"Same window last year: mean temp {metrics['temp_prev']:.1f} C, "
+                     f"rainfall {metrics['rain_prev']:.0f} mm, rainy days {metrics['days_prev']}.")
+    lines.append("Rainy day = daily rain >= 1.0mm. Season transition = first day the 7-day rolling mean crossed the threshold.")
     for k, thr, direction, _ in SEASONS:
         parts = [f"{y}: {signals[k][y].date()}" if signals[k][y] is not None else f"{y}: not reached" for y in years]
         avg = summary[k]["avg_md"]
-        lines.append(f"{k} (7-day mean {'>=' if direction == 'up' else '<'} {thr} C): " + "; ".join(parts)
+        lines.append(f"{k} (threshold {'>=' if direction == 'up' else '<'} {thr} C): " + "; ".join(parts)
                      + (f"; historical avg {avg[0]}/{avg[1]}" if avg else ""))
     for _, r in monthly.dropna(subset=["temp"]).tail(24).iterrows():
         lines.append(f"{int(r.year)}-{int(r.month):02d}: mean {r.temp:.1f} C, rain {r.rain:.0f} mm, rainy days {r.days:.0f}")
-    lines.append("No sales data is available.")
     return "\n".join(lines)
 
 
@@ -655,18 +875,22 @@ def ai_reply(question: str, context: str, t) -> str:
         resp = client.models.generate_content(
             model=model, contents=f"{t('ai_context')}\n\nDATA:\n{context}\n\nQUESTION:\n{question}")
         return resp.text or t("ai_error", e="empty response")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return t("ai_error", e=str(e))
 
 
+def set_question(text: str) -> None:
+    st.session_state["ai_q"] = text
+
+
 # =============================================================================
-# 主程式
+# 主畫面
 # =============================================================================
 st.markdown(CSS, unsafe_allow_html=True)
 
-# ---- 標題列：品牌 / 資料資訊 / 城市 / 語言 ----
-c_brand, c_meta, c_city, c_lang = st.columns([3.2, 1.8, 1.5, 1.2], vertical_alignment="bottom")
-with c_lang:
+# ---- 頂部：品牌列（左）＋ 城市 / 語言（右）同一排 ----
+col_brand, col_city, col_lang = st.columns([5, 1.7, 1.4], vertical_alignment="center")
+with col_lang:
     lang_choice = st.selectbox("Language", ["繁體中文", "English"], key="ui_lang", label_visibility="collapsed")
 lang = "zh" if lang_choice == "繁體中文" else "en"
 
@@ -676,14 +900,17 @@ def t(key: str, **kw) -> str:
     return s.format(**kw) if kw else s
 
 
-with c_city:
+with col_city:
     city = st.selectbox(
         t("choose_city"), list(CITIES.keys()), index=0, key="ui_city", label_visibility="collapsed",
         format_func=lambda k: CITIES[k][0] if lang == "zh" else k)
-with c_brand:
-    st.markdown(f'<div class="eyebrow">{t("eyebrow")}</div><div class="brand-title">{esc(t("app_title"))}</div>',
-                unsafe_allow_html=True)
-meta_ph = c_meta.empty()
+with col_brand:
+    st.markdown(
+        '<div class="exec-nav-bar"><div class="exec-left"><div class="exec-logo">🌤</div><div>'
+        '<div class="exec-sub">RETAIL CLIMATE INTELLIGENCE SYSTEM</div>'
+        '<div class="exec-title">Taiwan Weather Analytics</div></div></div>'
+        f'<div class="exec-live">● {esc(t("live"))}</div></div>',
+        unsafe_allow_html=True)
 
 # ---- 取資料 ----
 today = date.today()
@@ -694,16 +921,12 @@ try:
         df = fetch_weather(city, start_req.isoformat(), end_req.isoformat())
     if df.empty:
         raise ValueError("empty dataset")
-except Exception as exc:  # noqa: BLE001
+except Exception as exc:
     st.error(t("load_error", e=exc))
     st.stop()
 
 end = df["date"].max()
 years = list(range(end.year - 3, end.year + 1))
-meta_ph.markdown(
-    f'<div class="meta"><b>{esc(t("data_until", d=end.date().isoformat()))}</b></div>',
-    unsafe_allow_html=True)
-
 metrics = last30_metrics(df)
 monthly = monthly_table(df)
 signals, summary = compute_signals(df, years, end)
@@ -712,22 +935,30 @@ signals, summary = compute_signals(df, years, end)
 city_name = CITIES[city][0] if lang == "zh" else city
 region = t(CITIES[city][1])
 st.markdown(
-    f'<div class="eyebrow hero-region">{esc(region)} · {years[0]}–{years[-1]}</div>'
-    f'<div class="hero-city">{esc(city_name)}</div><div class="hero-desc">{esc(t("hero_desc"))}</div>',
+    '<div class="hero-box"><div class="hero-grid"><div>'
+    '<div class="badge-row">'
+    f'<span class="badge-primary">📍 {esc(region)}</span>'
+    f'<span class="badge-neutral">🗓 {esc(t("base_period", a=years[0], b=years[-1]))}</span>'
+    f'<span class="badge-neutral">🕒 {esc(t("data_until", d=end.date().isoformat()))}</span>'
+    '</div>'
+    f'<div class="hero-city-title">{esc(city_name)}</div>'
+    f'<div class="hero-summary-text">{esc(t("hero_desc"))}</div>'
+    '</div>'
+    f'<div class="prog-panel"><div class="prog-title">{esc(t("progress_title"))}</div>'
+    f'{progress_html(signals, summary, years, end, t)}</div>'
+    '</div></div>',
     unsafe_allow_html=True)
 
 # ---- KPI ----
-def delta(v, unit: str, dec: int = 1) -> str:
-    arrow = "↗" if v > 0 else ("↘" if v < 0 else "→")
-    return f'<span class="up">{arrow} {v:+.{dec}f}{unit}</span>'
-
-
 if metrics["temp_prev"] is not None:
     d_t = metrics["temp"] - metrics["temp_prev"]
     d_r = metrics["rain"] - metrics["rain_prev"]
-    sub_t = t("vs_last", v=f'{metrics["temp_prev"]:.1f}°') + " · " + delta(round(d_t, 1), "°")
-    sub_r = t("vs_last", v=f'{metrics["rain_prev"]:.0f}mm') + " · " + delta(round(d_r), "mm", 0)
-    sub_d = t("vs_last", v=f'{metrics["days_prev"]}{t("day_unit")}') + " " + t("rain_def")
+    prev_t = f'{metrics["temp_prev"]:.1f}°C'
+    prev_r = f'{metrics["rain_prev"]:.0f}mm'
+    prev_d = f'{metrics["days_prev"]}{t("day_unit")}'
+    sub_t = esc(t("vs_last", v=prev_t)) + " " + pill(round(d_t, 1), "°C", 1, t("warm_tag"), t("cool_tag"), t("flat_tag"))
+    sub_r = esc(t("vs_last", v=prev_r)) + " " + pill(round(d_r), "mm", 0, t("wet_tag"), t("dry_tag"), t("flat_tag"))
+    sub_d = esc(t("vs_last", v=prev_d)) + f' · {esc(t("rain_def"))}'
 else:
     sub_t = sub_r = sub_d = "—"
 
@@ -736,111 +967,130 @@ if next_key:
     est = summary[next_key]["est"]
     if est:
         n = (pd.Timestamp(est) - end).days
-        est_line = t("est_line", d=f"{est.month}/{est.day}", n=n) if n > 0 else t("est_soon", d=f"{est.month}/{est.day}")
+        est_line = (t("est_line", d=f"{est.month}/{est.day}", n=n) if n > 0
+                    else t("est_soon", d=f"{est.month}/{est.day}"))
     else:
         est_line = t("not_reached")
-    dark = (f'<div class="eyebrow">{t("next_signal")}</div><div class="name">{esc(t(next_key))}</div>'
-            f'<div class="sub">{esc(est_line)}</div><div class="items">{esc(t(next_key + "_items"))}</div>')
+    dark_card = (
+        f'<div class="kpi-top"><div class="kpi-label">{esc(t("next_signal"))}</div><div class="kpi-icon">⚡</div></div>'
+        f'<div class="name">{esc(t(next_key))}</div>'
+        f'<div><span class="badge">{esc(est_line)}</span></div>'
+        f'<div class="items">🎯 {esc(t("focus_label"))}：{esc(t(next_key + "_items"))}</div>')
 else:
-    dark = f'<div class="eyebrow">{t("next_signal")}</div><div class="name" style="font-size:18px">{esc(t("all_done"))}</div>'
+    dark_card = (
+        f'<div class="kpi-top"><div class="kpi-label">{esc(t("next_signal"))}</div><div class="kpi-icon">✓</div></div>'
+        f'<div class="name" style="font-size:24px;">{esc(t("all_done"))}</div>')
 
-days_unit = t("day_unit")
 st.markdown(
     '<div class="kpi-row">'
-    f'<div class="kpi"><div class="eyebrow">{t("kpi_temp")}</div><div class="big">{metrics["temp"]:.1f}°</div><div class="sub">{sub_t}</div></div>'
-    f'<div class="kpi"><div class="eyebrow">{t("kpi_rain")}</div><div class="big" style="color:#2F6DA8">{metrics["rain"]:.0f}<small>mm</small></div><div class="sub">{sub_r}</div></div>'
-    f'<div class="kpi"><div class="eyebrow">{t("kpi_days")}</div><div class="big">{metrics["days"]}<small>{esc(days_unit)}</small></div><div class="sub">{sub_d}</div></div>'
-    f'<div class="kpi dark">{dark}</div></div>',
+    f'<div class="kpi"><div class="kpi-top"><div class="kpi-label">{esc(t("kpi_temp"))}</div><div class="kpi-icon">🌡️</div></div>'
+    f'<div class="big">{metrics["temp"]:.1f}<small>°C</small></div><div class="sub">{sub_t}</div></div>'
+    f'<div class="kpi"><div class="kpi-top"><div class="kpi-label">{esc(t("kpi_rain"))}</div><div class="kpi-icon">💧</div></div>'
+    f'<div class="big" style="color:#0284C7">{metrics["rain"]:.0f}<small>mm</small></div><div class="sub">{sub_r}</div></div>'
+    f'<div class="kpi"><div class="kpi-top"><div class="kpi-label">{esc(t("kpi_days"))}</div><div class="kpi-icon">🌧️</div></div>'
+    f'<div class="big">{metrics["days"]}<small>{esc(t("day_unit").strip())}</small></div><div class="sub">{sub_d}</div></div>'
+    f'<div class="kpi dark">{dark_card}</div>'
+    '</div>',
     unsafe_allow_html=True)
 
-# ---- 四張洞察卡片 ----
+# ---- 摘要卡 ----
 cards = []
-# 1) 與去年同期
 if metrics["temp_prev"] is not None:
     dd = metrics["temp"] - metrics["temp_prev"]
     if abs(dd) < 0.5:
-        cards.append(("↗", t("ins_similar"), t("ins_similar_body", d=f"{abs(dd):.1f}")))
+        cards.append((t("tag_plan"), t("ins_similar"), t("ins_similar_body", d=f"{abs(dd):.1f}")))
     elif dd > 0:
-        cards.append(("↗", t("ins_warmer"), t("ins_warmer_body", d=f"{dd:.1f}")))
+        cards.append((t("tag_shift"), t("ins_warmer"), t("ins_warmer_body", d=f"{dd:.1f}")))
     else:
-        cards.append(("↘", t("ins_cooler"), t("ins_cooler_body", d=f"{abs(dd):.1f}")))
+        cards.append((t("tag_stock"), t("ins_cooler"), t("ins_cooler_body", d=f"{abs(dd):.1f}")))
 else:
-    cards.append(("↗", t("ins_similar"), t("no_data")))
-# 2) 最近訊號
+    cards.append((t("tag_plan"), t("ins_similar"), t("no_data")))
+
 found = [(signals[k][years[-1]], k) for k, *_ in SEASONS if signals[k].get(years[-1]) is not None]
 if found:
     ts, k = max(found, key=lambda x: x[0])
     avg = summary[k]["avg_md"]
-    cards.append(("❄", t("ins_signal", s=t(k)),
-                  t("ins_signal_body", d=f"{ts.month}/{ts.day}", a=f"{avg[0]}/{avg[1]}" if avg else "—", items=t(k + "_items"))))
+    cards.append((t("tag_season"), t("ins_signal", s=t(k)),
+                  t("ins_signal_body", d=f"{ts.month}/{ts.day}", a=f"{avg[0]}/{avg[1]}" if avg else "—",
+                    items=t(k + "_items"))))
 else:
-    cards.append(("❄", t("ins_signal_none"), t("ins_signal_none_body")))
-# 3) 最潮濕月份 / 4) 最熱最冷
+    cards.append((t("tag_season"), t("ins_signal_none"), t("ins_signal_none_body")))
+
 mm = monthly.dropna(subset=["temp"]).groupby("month").agg(temp=("temp", "mean"), rain=("rain", "mean"))
 if not mm.empty:
     wet = int(mm.rain.idxmax())
     hot, cold = int(mm.temp.idxmax()), int(mm.temp.idxmin())
-    cards.append(("☂", t("ins_wet", m=mlabel(wet, lang)), t("ins_wet_body", x=f"{mm.rain.max():.0f}")))
-    cards.append(("♨", t("ins_hot_cold", h=mlabel(hot, lang), c=mlabel(cold, lang)),
+    cards.append((t("tag_rain"), t("ins_wet", m=mlabel(wet, lang)), t("ins_wet_body", x=f"{mm.rain.max():.0f}")))
+    cards.append((t("tag_extreme"), t("ins_hot_cold", h=mlabel(hot, lang), c=mlabel(cold, lang)),
                   t("ins_hot_cold_body", a=f"{mm.temp.max():.1f}", b=f"{mm.temp.min():.1f}")))
 else:
-    cards.append(("☂", "—", t("no_data")))
-    cards.append(("♨", "—", t("no_data")))
+    cards.append((t("tag_rain"), "—", t("no_data")))
+    cards.append((t("tag_extreme"), "—", t("no_data")))
 
-st.markdown('<div class="ins-row">' + "".join(
-    f'<div class="ins"><div class="ic">{ic}</div><div class="tt">{esc(tt)}</div><div class="bd">{esc(bd)}</div></div>'
-    for ic, tt, bd in cards) + "</div>", unsafe_allow_html=True)
+st.markdown(
+    f'<div class="ins-title">{esc(t("insights_title"))}</div><div class="ins-row">' + "".join(
+        f'<div class="ins"><div class="ins-tag">{esc(tag)}</div><div class="tt">{esc(tt)}</div>'
+        f'<div class="bd">{esc(bd)}</div></div>' for tag, tt, bd in cards) + "</div>",
+    unsafe_allow_html=True)
 
-# ---- 01 長期走勢 ----
+# ---- 01 氣候走勢 ----
 with st.container(key="sec1"):
-    a, b = st.columns([3, 1.6], vertical_alignment="bottom")
-    with a:
+    col_a, col_b = st.columns([2.6, 1.4], vertical_alignment="center")
+    with col_a:
         section_header(t("sec1"), t("sec1_title"), t("sec1_sub"))
-    with b:
-        rng = st.radio("range", ["all", "1y", "6m"], horizontal=True, key="rng", label_visibility="collapsed",
-                       format_func=lambda x: t("rng_" + x))
+    with col_b:
+        rng = segmented("range", ["all", "1y", "6m"], "rng", lambda x: t("rng_" + x))
     plot_weekly(df, rng, t)
 
-# ---- 02 年度對比 ----
+# ---- 02 年度基準 ----
 with st.container(key="sec2"):
-    a, b = st.columns([3, 1.6], vertical_alignment="bottom")
-    with a:
+    col_a, col_b = st.columns([2.6, 1.4], vertical_alignment="center")
+    with col_a:
         section_header(t("sec2"), t("sec2_title"), t("sec2_sub"))
-    with b:
-        metric = st.radio("metric", ["temp", "rain", "days"], horizontal=True, key="metric",
-                          label_visibility="collapsed", format_func=lambda x: t("m_" + x))
+    with col_b:
+        metric = segmented("metric", ["temp", "rain", "days"], "metric", lambda x: t("m_" + x))
     plot_monthly(monthly, years, metric, lang, t)
     st.markdown(f'<div class="note-right">{esc(t("note_" + metric))}</div>', unsafe_allow_html=True)
 
-# ---- 03 換季時機 ----
+# ---- 03 換季時序 ----
 with st.container(key="sec3"):
     section_header(t("sec3"), t("sec3_title"), t("sec3_sub"))
-
-    rules = " ｜ ".join(
-        f"{t(k)}：{season_rule(k, t)}（{t(k + '_items')}）"
-        for k, *_ in SEASONS
-    )
-
-    st.caption(rules)
+    st.markdown(rule_grid_html(t), unsafe_allow_html=True)
     plot_timeline(signals, summary, years, end, lang, t)
-    st.markdown(season_table_html(signals, summary, years, lang, t), unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="scroll-hint">{esc(t("scroll_hint"))}</div>'
+        f'<div class="table-scroll">{season_table_html(signals, summary, years, lang, t)}</div>',
+        unsafe_allow_html=True)
 
 # ---- 04 商品企劃 ----
 with st.container(key="sec4"):
     section_header(t("sec4"), t("sec4_title"), t("sec4_sub"))
-    st.markdown(heatmap_html(df, lang, t), unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="scroll-hint">{esc(t("scroll_hint"))}</div>'
+        f'<div class="table-scroll">{heatmap_html(df, lang, t)}</div>',
+        unsafe_allow_html=True)
 
 st.markdown(f'<div class="footnote">{esc(t("footnote"))}</div>', unsafe_allow_html=True)
 
-# ---- 右下角：問天氣 AI ----
+# ---- 右下角 AI ----
 with st.container(key="ai_float"):
     with st.popover("💬 " + t("ask_ai")):
-        st.markdown(f"**{t('ai_title')}**")
-        q = st.text_area("q", placeholder=t("ai_placeholder"), key="ai_q", label_visibility="collapsed", height=90)
+        st.markdown(f"### {t('ai_title')}")
+        st.caption(t("ai_hint"))
+        q = st.text_area("q", placeholder=t("ai_placeholder"), key="ai_q",
+                         label_visibility="collapsed", height=100)
+        st.markdown(f"<div style='font-size:14px;color:#64748B;margin:6px 0 4px;'>{esc(t('ai_examples'))}</div>",
+                    unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.button(t("ai_q1_btn"), key="btn_q1", on_click=set_question, args=(t("ai_q1"),))
+        with c2:
+            st.button(t("ai_q2_btn"), key="btn_q2", on_click=set_question, args=(t("ai_q2"),))
         if st.button(t("ai_send"), key="ai_send"):
             if q.strip():
                 with st.spinner(t("ai_thinking")):
                     ctx = build_ai_context(city, metrics, signals, summary, years, monthly)
                     st.session_state["ai_answer"] = ai_reply(q.strip(), ctx, t)
         if st.session_state.get("ai_answer"):
+            st.divider()
             st.markdown(st.session_state["ai_answer"])

@@ -614,7 +614,6 @@ FONT = "Plus Jakarta Sans, Noto Sans TC, sans-serif"
 
 
 def plotly_show(fig: go.Figure) -> None:
-    # 關閉手機滑動縮放與工具列，避免手指滑動網頁時卡在圖表裡
     cfg = {
         "displayModeBar": False,
         "responsive": True,
@@ -631,7 +630,7 @@ def style_fig(fig: go.Figure, height: int) -> None:
     fig.update_layout(
         height=height,
         autosize=True,
-        dragmode=False,  # 手機滑動頁面不誤觸拖曳框選
+        dragmode=False,
         margin=dict(l=48, r=16, t=48, b=36),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -641,7 +640,6 @@ def style_fig(fig: go.Figure, height: int) -> None:
             font=dict(size=13.5, color="#1E293B", family=FONT),
             bgcolor="rgba(255,255,255,0)",
         ),
-        # 改用深色高對比小提示框，手機點擊時清晰不擋畫面
         hoverlabel=dict(
             bgcolor="#0F172A",
             font_size=13.5,
@@ -696,7 +694,6 @@ def plot_weekly(df: pd.DataFrame, rng: str, t) -> None:
         hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_rain") + "：<b>%{y:.0f} mm</b><extra></extra>"), row=2, col=1)
 
     style_fig(fig, 480)
-    # 改用 closest 單點觸控，避免手機出現巨大白色便當盒遮擋圖表
     fig.update_layout(hovermode="closest", bargap=0.2, margin=dict(l=48, r=14, t=58, b=28))
     tmin, tmax = float(w.tmin.min()), float(w.tmax.max())
     fig.update_yaxes(range=[np.floor(tmin) - 2, np.ceil(tmax) + 2], title_text=t("temp_axis"), row=1, col=1)
@@ -758,8 +755,8 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
         last = (yr == years[-1])
         fig.add_trace(go.Scatter(
             x=xs, y=ys, mode="markers", name=str(yr), text=texts,
-            marker=dict(size=18 if last else 13, color=YEAR_COLORS[yi], opacity=0.95,
-                        line=dict(color="#FFFFFF", width=2)),
+            marker=dict(size=15 if last else 11, color=YEAR_COLORS[yi], opacity=0.95,
+                        line=dict(color="#FFFFFF", width=1.8)),
             hovertemplate=f"<b>{yr}</b> · %{{text}}<extra></extra>"))
     ex, ey, et = [], [], []
     for k in keys:
@@ -771,43 +768,45 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
     if ex:
         fig.add_trace(go.Scatter(
             x=ex, y=ey, mode="markers", name=t("est_legend"), text=et,
-            marker=dict(size=18, color="#FFFFFF", line=dict(color=ACCENT, width=3)),
+            marker=dict(size=15, color="#FFFFFF", line=dict(color=ACCENT, width=2.8)),
             hovertemplate="%{text}<extra></extra>"))
-    fig.add_vline(x=norm_doy(end), line_width=1.6, line_color="#94A3B8", line_dash="dot",
-                  annotation_text=t("today"), annotation_position="bottom right",
-                  annotation_font=dict(size=12, color="#64748B"))
+    fig.add_vline(x=norm_doy(end), line_width=1.5, line_color="#94A3B8", line_dash="dot",
+                  annotation_text=t("today"), annotation_position="bottom left",
+                  annotation_font=dict(size=11, color="#64748B"))
     for k in keys:
         cur = signals[k].get(years[-1])
         if cur is not None:
-            label = f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:11.5px;color:#059669'>✓ {t('this_year_found')}</span>"
+            label = f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:11px;color:#059669'>✓ {t('this_year_found')}</span>"
             color = ACCENT
         elif summary[k]["est"]:
             e = summary[k]["est"]
             n = max(0, (pd.Timestamp(e) - end).days)
-            label = f"<b>{e.month}/{e.day}</b><br><span style='font-size:11.5px;color:#B45309'>{t('est_label')} · {t('days_after', n=n)}</span>"
+            label = f"<b>{e.month}/{e.day}</b><br><span style='font-size:11px;color:#B45309'>{t('est_label')} · {t('days_after', n=n)}</span>"
             color = INK
         else:
             label, color = f"<b>{t('not_reached')}</b>", "#94A3B8"
-        fig.add_annotation(xref="paper", x=1.015, xanchor="left", y=row_y[k], yref="y", text=label,
-                           showarrow=False, font=dict(color=color, size=14.5), align="left")
-    style_fig(fig, 380)
+        fig.add_annotation(xref="paper", x=1.02, xanchor="left", y=row_y[k], yref="y", text=label,
+                           showarrow=False, font=dict(color=color, size=13), align="left")
+    style_fig(fig, 390)
     fig.update_layout(
-        margin=dict(l=84, r=135, t=58, b=36),
+        margin=dict(l=72, r=108, t=34, b=78),
         hovermode="closest",
-        legend=dict(orientation="h", x=0, xanchor="left", y=1.15, font=dict(size=13)),
+        legend=dict(
+            orientation="h", x=0.5, xanchor="center", y=-0.16, yanchor="top",
+            font=dict(size=12.5, color="#1E293B"),
+        ),
     )
-    # 手機窄螢幕改每兩個月顯示一個刻度，避免重疊
-    tick_months = [1, 3, 5, 7, 9, 11]
+    tick_months = [1, 4, 7, 10]
     fig.update_xaxes(
-        range=[1, 366], tickmode="array",
+        range=[1, 366], tickmode="array", tickangle=0,
         tickvals=[date(2001, m, 1).timetuple().tm_yday for m in tick_months],
         ticktext=[mlabel(m, lang) for m in tick_months],
-        showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=12.5),
+        showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=12),
     )
     fig.update_yaxes(
         range=[-0.6, len(keys) - 0.4], tickmode="array", tickvals=[row_y[k] for k in keys],
         ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False,
-        tickfont=dict(size=14, color="#0F172A"),
+        tickfont=dict(size=13, color="#0F172A"),
     )
     plotly_show(fig)
 

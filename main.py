@@ -597,7 +597,6 @@ button[data-testid="stBaseButton-segmented_controlActive"] p { color: #FFFFFF !i
   .sec-sub { font-size: 15px; }
   .season-table { min-width: 620px; }
   .scroll-hint { display: block; }
-  /* 手機版 AI 懸浮按鈕往上移，避開 Streamlit Cloud 右下角紅色皇冠圖示 */
   .st-key-ai_float { right: 14px; bottom: 72px; }
   .st-key-ai_float button { padding: 10px 18px !important; font-size: 14px !important; }
   .st-key-ai_float button p { font-size: 14px !important; }
@@ -787,15 +786,16 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
             label, color = f"<b>{t('not_reached')}</b>", "#94A3B8"
         fig.add_annotation(xref="paper", x=1.02, xanchor="left", y=row_y[k], yref="y", text=label,
                            showarrow=False, font=dict(color=color, size=13), align="left")
-    style_fig(fig, 390)
+    style_fig(fig, 410)
     fig.update_layout(
-        margin=dict(l=72, r=108, t=34, b=78),
+        margin=dict(l=72, r=114, t=34, b=82),
         hovermode="closest",
         legend=dict(
             orientation="h", x=0.5, xanchor="center", y=-0.16, yanchor="top",
             font=dict(size=12.5, color="#1E293B"),
         ),
     )
+    fig.update_traces(cliponaxis=False)
     tick_months = [1, 4, 7, 10]
     fig.update_xaxes(
         range=[1, 366], tickmode="array", tickangle=0,

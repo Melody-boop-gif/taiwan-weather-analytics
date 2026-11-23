@@ -398,13 +398,14 @@ def hex_rgb(c: str):
 
 
 # =============================================================================
-# 樣式（字級已整體放大、間距收緊）
+# 樣式（含手機 RWD 與淺色主題強制保護，避免手機深色模式反黑與便當盒遮擋）
 # =============================================================================
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700;800&display=swap');
 
 :root {
+  color-scheme: light only;
   --font-sans: 'Plus Jakarta Sans', 'Noto Sans TC', -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --bg-page: #EEF2F7;
@@ -416,8 +417,8 @@ CSS = """
 }
 html, body, [class*="css"], .stApp {
   font-family: var(--font-sans);
-  color: #0F172A;
-  background: var(--bg-page);
+  color: #0F172A !important;
+  background: var(--bg-page) !important;
   font-size: 17px;
   -webkit-font-smoothing: antialiased;
 }
@@ -450,7 +451,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .badge-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .badge-primary { background: #FFF1EA; color: #C2410C; border: 1px solid #FDBA74; padding: 6px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 700; }
 .badge-neutral { background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 600; }
-.hero-city-title { font-size: clamp(3rem, 5.4vw, 4.8rem); font-weight: 900; letter-spacing: -.035em; line-height: 1.08; margin: 8px 0 14px; }
+.hero-city-title { font-size: clamp(2.6rem, 5.4vw, 4.8rem); font-weight: 900; letter-spacing: -.035em; line-height: 1.08; margin: 8px 0 14px; color: #0F172A; }
 .hero-summary-text { font-size: 18px; color: #334155; line-height: 1.75; max-width: 780px; }
 
 .prog-panel { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px 22px; }
@@ -460,9 +461,9 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .prog-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 14px; background: #CBD5E1; }
 .prog-row.ok .prog-dot { background: #10B981; box-shadow: 0 0 0 4px rgba(16,185,129,.18); }
 .prog-row.wait .prog-dot { background: #fff; border: 3px solid var(--accent); }
-.prog-name { flex: 1; font-size: 18px; font-weight: 800; }
+.prog-name { flex: 1; font-size: 18px; font-weight: 800; color: #0F172A; }
 .prog-name small { display: block; font-size: 13.5px; font-weight: 600; color: #64748B; margin-top: 1px; }
-.prog-date { font-family: var(--font-mono); font-size: 22px; font-weight: 800; }
+.prog-date { font-family: var(--font-mono); font-size: 22px; font-weight: 800; color: #0F172A; }
 .prog-row.ok .prog-date { color: var(--accent); }
 
 /* KPI */
@@ -475,7 +476,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .kpi-top { display: flex; justify-content: space-between; align-items: center; }
 .kpi-label { font-size: 14px; font-weight: 800; color: #64748B; letter-spacing: .04em; }
 .kpi-icon { font-size: 22px; }
-.kpi .big { font-family: var(--font-mono); font-size: clamp(44px, 4.4vw, 62px); font-weight: 800; letter-spacing: -.04em; line-height: 1; margin: 14px 0 12px; font-variant-numeric: tabular-nums; }
+.kpi .big { font-family: var(--font-mono); font-size: clamp(42px, 4.4vw, 62px); font-weight: 800; letter-spacing: -.04em; line-height: 1; margin: 14px 0 12px; font-variant-numeric: tabular-nums; color: #0F172A; }
 .kpi .big small { font-size: 22px; font-weight: 700; margin-left: 4px; color: #64748B; letter-spacing: 0; }
 .kpi .sub { font-size: 15px; color: #475569; line-height: 1.6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .pill { font-family: var(--font-mono); font-size: 13.5px; font-weight: 800; padding: 3px 10px; border-radius: 7px; }
@@ -484,39 +485,39 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .pill-flat { background: #EEF2F7; color: #475569; }
 .kpi.dark { background: linear-gradient(135deg, #0F172A 0%, #243349 100%); border: 1px solid rgba(251,191,36,.5); color: #fff; }
 .kpi.dark .kpi-label { color: #FBBF24; }
-.kpi.dark .name { font-size: 34px; font-weight: 900; letter-spacing: -.02em; margin: 12px 0 10px; }
+.kpi.dark .name { font-size: 32px; font-weight: 900; letter-spacing: -.02em; margin: 12px 0 10px; color: #fff; }
 .kpi.dark .badge { display: inline-block; background: rgba(251,191,36,.18); color: #FDE68A; border: 1px solid rgba(251,191,36,.5); font-size: 14.5px; font-weight: 700; padding: 5px 12px; border-radius: 8px; }
 .kpi.dark .items { font-size: 15px; color: #E2E8F0; line-height: 1.6; border-top: 1px solid rgba(255,255,255,.14); padding-top: 11px; margin-top: 14px; }
 
 /* 摘要卡 */
-.ins-title { font-size: 22px; font-weight: 800; margin: 6px 0 14px; display: flex; align-items: center; gap: 10px; }
+.ins-title { font-size: 22px; font-weight: 800; margin: 6px 0 14px; display: flex; align-items: center; gap: 10px; color: #0F172A; }
 .ins-title::before { content: ""; width: 6px; height: 24px; background: var(--accent); border-radius: 3px; }
 .ins-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 26px; }
 .ins { background: var(--bg-surface); border: 1px solid var(--border); border-top: 4px solid #0F172A; border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
 .ins-tag { font-family: var(--font-mono); font-size: 12.5px; font-weight: 800; color: var(--accent); letter-spacing: .08em; margin-bottom: 8px; }
-.ins .tt { font-size: 18.5px; font-weight: 800; line-height: 1.4; margin-bottom: 8px; }
+.ins .tt { font-size: 18.5px; font-weight: 800; line-height: 1.4; margin-bottom: 8px; color: #0F172A; }
 .ins .bd { font-size: 15.5px; color: #475569; line-height: 1.75; }
 
 /* 分析區塊 */
 [class*="st-key-sec"] { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 22px; padding: 28px 32px 24px; margin-bottom: 24px; box-shadow: var(--shadow); }
 .eyebrow { color: var(--accent); font-weight: 800; font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; }
-.sec-title { font-size: clamp(26px, 2.4vw, 32px); font-weight: 800; letter-spacing: -.02em; margin: 4px 0 6px; }
+.sec-title { font-size: clamp(24px, 2.4vw, 32px); font-weight: 800; letter-spacing: -.02em; margin: 4px 0 6px; color: #0F172A; }
 .sec-sub { font-size: 16.5px; color: #475569; line-height: 1.6; margin-bottom: 8px; }
 .note-right { text-align: right; font-size: 14px; color: #64748B; margin-top: 8px; font-weight: 500; }
 
 /* 規則卡 */
 .rule-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 10px 0 18px; }
 .rule-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px 18px; }
-.rule-name { font-size: 18px; font-weight: 800; }
+.rule-name { font-size: 18px; font-weight: 800; color: #0F172A; }
 .rule-cond { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--accent); margin: 3px 0 4px; }
 .rule-items { font-size: 14.5px; color: #64748B; line-height: 1.5; }
 
 /* 表格 */
-.table-scroll { width: 100%; overflow-x: auto; border-radius: 14px; border: 1px solid var(--border); background: #fff; margin-top: 12px; }
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 14px; border: 1px solid var(--border); background: #fff; margin-top: 12px; }
 .scroll-hint { display: none; font-size: 14px; color: #475569; background: #F1F5F9; padding: 8px 12px; border-radius: 8px; margin-top: 8px; text-align: center; font-weight: 600; }
 .season-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .season-table th { background: #F8FAFC; color: #334155; font-weight: 800; text-align: left; padding: 15px 20px; border-bottom: 2px solid #CBD5E1; white-space: nowrap; font-size: 15px; }
-.season-table td { padding: 15px 20px; border-bottom: 1px solid #E2E8F0; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; font-size: 16.5px; }
+.season-table td { padding: 15px 20px; border-bottom: 1px solid #E2E8F0; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; font-size: 16.5px; color: #0F172A; }
 .season-table tr:hover td { background: #F8FAFC; }
 .season-table td:first-child { font-family: var(--font-sans); font-weight: 800; font-size: 17px; }
 .season-table td.avg { font-weight: 800; color: var(--accent); }
@@ -529,49 +530,97 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .heat th { font-size: 15px; font-weight: 800; color: #334155; text-align: center; padding-bottom: 6px; }
 .heat th:first-child { width: 240px; text-align: left; }
 .heat td.lab { width: 240px; text-align: left; padding-right: 12px; }
-.heat .bn { font-size: 17px; font-weight: 800; }
+.heat .bn { font-size: 17px; font-weight: 800; color: #0F172A; }
 .heat .bi { font-size: 13.5px; color: #64748B; margin-top: 2px; line-height: 1.4; }
 .heat td.cell { height: 58px; border-radius: 10px; text-align: center; font-size: 15.5px; font-weight: 800; font-family: var(--font-mono); border: 1px solid rgba(0,0,0,.04); }
 
 .footnote { font-size: 14px; color: #64748B; margin: 8px 4px 40px; line-height: 1.8; }
 
-/* Streamlit 元件 */
-div[data-testid="stSelectbox"] > div { border-radius: 12px !important; border-color: #CBD5E1 !important; background: #fff !important; }
-div[data-testid="stSelectbox"] div[data-baseweb="select"] { font-size: 16px !important; min-height: 48px; }
-div[data-testid="stSegmentedControl"] button, div[data-testid="stRadio"] label { font-size: 15.5px !important; font-weight: 700 !important; }
-button[data-testid="stBaseButton-segmented_controlActive"] { background: #0F172A !important; color: #fff !important; }
-button[data-testid="stBaseButton-segmented_controlActive"] p { color: #fff !important; }
+/* Streamlit 元件強制淺色主題（防止手機深色模式反黑） */
+div[data-testid="stSelectbox"] > div,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+  border-radius: 12px !important;
+  border-color: #CBD5E1 !important;
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+  font-size: 16px !important;
+  min-height: 48px;
+}
+div[data-testid="stSelectbox"] svg { fill: #334155 !important; }
 
-.st-key-ai_float { position: fixed; right: 30px; bottom: 30px; z-index: 9999; width: auto !important; }
-.st-key-ai_float button { background: #0F172A !important; color: #fff !important; border-radius: 999px !important; border: 1px solid rgba(255,255,255,.2) !important; padding: 14px 28px !important; font-weight: 800 !important; font-size: 16px !important; box-shadow: 0 12px 28px -4px rgba(15,23,42,.45) !important; }
-.st-key-ai_float button p { color: #fff !important; font-size: 16px !important; }
-[data-testid="stPopoverBody"] { min-width: 420px !important; border-radius: 18px !important; }
+div[data-testid="stSegmentedControl"] {
+  background-color: #F1F5F9 !important;
+  border-radius: 12px !important;
+  padding: 3px !important;
+}
+div[data-testid="stSegmentedControl"] button {
+  background-color: transparent !important;
+  color: #334155 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  border-radius: 9px !important;
+}
+div[data-testid="stSegmentedControl"] button p { color: #334155 !important; }
+button[data-testid="stBaseButton-segmented_controlActive"] {
+  background-color: #0F172A !important;
+  color: #FFFFFF !important;
+}
+button[data-testid="stBaseButton-segmented_controlActive"] p { color: #FFFFFF !important; }
 
+/* 懸浮 AI 顧問按鈕 */
+.st-key-ai_float { position: fixed; right: 28px; bottom: 28px; z-index: 9999; width: auto !important; }
+.st-key-ai_float button {
+  background: #0F172A !important; color: #fff !important;
+  border-radius: 999px !important; border: 1px solid rgba(255,255,255,.25) !important;
+  padding: 13px 24px !important; font-weight: 800 !important; font-size: 15.5px !important;
+  box-shadow: 0 12px 28px -4px rgba(15,23,42,.45) !important;
+}
+.st-key-ai_float button p { color: #fff !important; font-size: 15.5px !important; }
+[data-testid="stPopoverBody"] { min-width: 420px !important; border-radius: 18px !important; background: #FFFFFF !important; color: #0F172A !important; }
+
+/* 平板與手機響應式調整 */
 @media (max-width: 1100px) {
   .hero-grid { grid-template-columns: 1fr; }
   .kpi-row, .ins-row, .rule-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 680px) {
-  .block-container { padding: 1rem 1rem 5rem !important; }
-  .exec-nav-bar { flex-direction: column; align-items: flex-start; }
-  .kpi-row, .ins-row, .rule-grid { grid-template-columns: 1fr; }
-  [class*="st-key-sec"] { padding: 20px 16px; }
+  .block-container { padding: 0.8rem 0.85rem 6rem !important; }
+  .exec-nav-bar { flex-direction: column; align-items: flex-start; padding: 16px 18px; }
+  .exec-title { font-size: 20px; }
+  .hero-box { padding: 20px 18px; border-radius: 18px; }
+  .hero-summary-text { font-size: 16px; }
+  .kpi-row, .ins-row, .rule-grid { grid-template-columns: 1fr; gap: 12px; }
+  .kpi { padding: 18px 20px; }
+  [class*="st-key-sec"] { padding: 18px 14px; border-radius: 18px; }
+  .sec-sub { font-size: 15px; }
   .season-table { min-width: 620px; }
   .scroll-hint { display: block; }
-  [data-testid="stPopoverBody"] { min-width: 300px !important; }
+  /* 手機版 AI 懸浮按鈕往上移，避開 Streamlit Cloud 右下角紅色皇冠圖示 */
+  .st-key-ai_float { right: 14px; bottom: 72px; }
+  .st-key-ai_float button { padding: 10px 18px !important; font-size: 14px !important; }
+  .st-key-ai_float button p { font-size: 14px !important; }
+  [data-testid="stPopoverBody"] { min-width: 88vw !important; max-width: 92vw !important; }
 }
 </style>
 """
 
 
 # =============================================================================
-# 圖表
+# 圖表（手機防誤觸 + 高對比單點提示框）
 # =============================================================================
 FONT = "Plus Jakarta Sans, Noto Sans TC, sans-serif"
 
 
 def plotly_show(fig: go.Figure) -> None:
-    cfg = {"displayModeBar": False, "responsive": True}
+    # 關閉手機滑動縮放與工具列，避免手指滑動網頁時卡在圖表裡
+    cfg = {
+        "displayModeBar": False,
+        "responsive": True,
+        "scrollZoom": False,
+        "doubleClick": False,
+    }
     try:
         st.plotly_chart(fig, width="stretch", config=cfg)
     except TypeError:
@@ -580,17 +629,36 @@ def plotly_show(fig: go.Figure) -> None:
 
 def style_fig(fig: go.Figure, height: int) -> None:
     fig.update_layout(
-        height=height, autosize=True,
-        margin=dict(l=70, r=30, t=40, b=30),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT, size=15, color="#334155"),
-        legend=dict(orientation="h", x=0, xanchor="left", y=-0.14,
-                    font=dict(size=15, color="#1E293B", family=FONT)),
-        hoverlabel=dict(bgcolor="#FFFFFF", font_size=15, font_family=FONT, bordercolor="#CBD5E1"),
+        height=height,
+        autosize=True,
+        dragmode=False,  # 手機滑動頁面不誤觸拖曳框選
+        margin=dict(l=48, r=16, t=48, b=36),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family=FONT, size=14, color="#334155"),
+        legend=dict(
+            orientation="h", x=0, xanchor="left", y=1.12,
+            font=dict(size=13.5, color="#1E293B", family=FONT),
+            bgcolor="rgba(255,255,255,0)",
+        ),
+        # 改用深色高對比小提示框，手機點擊時清晰不擋畫面
+        hoverlabel=dict(
+            bgcolor="#0F172A",
+            font_size=13.5,
+            font_family=FONT,
+            font_color="#FFFFFF",
+            bordercolor="#0F172A",
+        ),
     )
-    fig.update_xaxes(showgrid=False, linecolor="#CBD5E1", tickfont=dict(size=14, color="#475569"))
-    fig.update_yaxes(gridcolor="#EDF1F6", zeroline=False, tickfont=dict(size=14, color="#475569"),
-                     title_font=dict(size=15, color="#475569"))
+    fig.update_xaxes(
+        showgrid=False, linecolor="#CBD5E1", fixedrange=True,
+        tickfont=dict(size=12.5, color="#475569"),
+    )
+    fig.update_yaxes(
+        gridcolor="#EDF1F6", zeroline=False, fixedrange=True,
+        tickfont=dict(size=12.5, color="#475569"),
+        title_font=dict(size=13.5, color="#475569"),
+    )
 
 
 def section_header(eyebrow: str, title: str, sub: str) -> None:
@@ -611,26 +679,25 @@ def plot_weekly(df: pd.DataFrame, rng: str, t) -> None:
         tmean=("tmean", "mean"), tmax=("tmax", "max"), tmin=("tmin", "min"), rain=("rain", "sum")
     ).reset_index()
 
-    # 上下兩個面板：上＝氣溫，下＝雨量（各自獨立刻度，不再互相擠壓）
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.68, 0.32], vertical_spacing=0.08)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.66, 0.34], vertical_spacing=0.08)
     fig.add_trace(go.Scatter(
         x=w.date, y=w.tmin, mode="lines", line=dict(width=0), showlegend=False,
-        hovertemplate="%{y:.1f}°C<extra>" + t("wk_min") + "</extra>"), row=1, col=1)
+        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_min") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
     fig.add_trace(go.Scatter(
         x=w.date, y=w.tmax, mode="lines", line=dict(width=0), fill="tonexty",
         fillcolor="rgba(224,93,56,0.14)", name=t("wk_range"),
-        hovertemplate="%{y:.1f}°C<extra>" + t("wk_max") + "</extra>"), row=1, col=1)
+        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_max") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
     fig.add_trace(go.Scatter(
-        x=w.date, y=w.tmean, mode="lines", line=dict(color=ACCENT, width=3.2), name=t("wk_avg"),
-        hovertemplate="%{y:.1f}°C<extra>" + t("wk_avg") + "</extra>"), row=1, col=1)
+        x=w.date, y=w.tmean, mode="lines", line=dict(color=ACCENT, width=3), name=t("wk_avg"),
+        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_avg") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
     fig.add_trace(go.Bar(
         x=w.date, y=w.rain, name=t("wk_rain"),
-        marker=dict(color="rgba(14,165,233,0.55)", line=dict(color="rgba(2,132,199,0.8)", width=0.6)),
-        hovertemplate="%{y:.0f} mm<extra>" + t("wk_rain") + "</extra>"), row=2, col=1)
+        marker=dict(color="rgba(14,165,233,0.6)", line=dict(color="rgba(2,132,199,0.85)", width=0.5)),
+        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_rain") + "：<b>%{y:.0f} mm</b><extra></extra>"), row=2, col=1)
 
-    style_fig(fig, 520)
-    fig.update_layout(hovermode="x unified", bargap=0.2, margin=dict(l=70, r=30, t=60, b=30),
-                      legend=dict(orientation="h", x=0, y=1.1, font=dict(size=15)))
+    style_fig(fig, 480)
+    # 改用 closest 單點觸控，避免手機出現巨大白色便當盒遮擋圖表
+    fig.update_layout(hovermode="closest", bargap=0.2, margin=dict(l=48, r=14, t=58, b=28))
     tmin, tmax = float(w.tmin.min()), float(w.tmax.max())
     fig.update_yaxes(range=[np.floor(tmin) - 2, np.ceil(tmax) + 2], title_text=t("temp_axis"), row=1, col=1)
     fig.update_yaxes(range=[0, max(30.0, float(w.rain.max()) * 1.1)], title_text=t("rain_axis"), row=2, col=1)
@@ -647,24 +714,27 @@ def plot_monthly(monthly: pd.DataFrame, years: list[int], metric: str, lang: str
         ys = cur[col].to_numpy()
         name = f"{y}{t('year_suffix')}"
         fmt = ".1f" if metric != "days" else ".0f"
-        hover = f"%{{y:{fmt}}}{unit}<extra>{name}</extra>"
+        hover = f"<b>{name}</b> · %{{x}}<br>%{{y:{fmt}}}{unit}<extra></extra>"
         color = YEAR_COLORS[i]
         if metric == "temp":
             last = (y == years[-1])
             fig.add_trace(go.Scatter(
-                x=xs, y=ys, name=name, mode="lines+markers" if last else "lines", line_shape="spline",
-                line=dict(color=color, width=4 if last else 2.4),
-                marker=dict(size=9, color="#FFFFFF", line=dict(width=3, color=color)),
+                x=xs, y=ys, name=name, mode="lines+markers", line_shape="spline",
+                line=dict(color=color, width=3.8 if last else 2.2),
+                marker=dict(size=8 if last else 5, color="#FFFFFF" if last else color,
+                            line=dict(width=2.5 if last else 0, color=color)),
                 connectgaps=False, hovertemplate=hover))
         else:
-            fig.add_trace(go.Bar(x=xs, y=ys, name=name,
-                                 marker=dict(color=color, line=dict(color="#FFFFFF", width=1)),
-                                 hovertemplate=hover))
-    style_fig(fig, 470)
-    fig.update_layout(barmode="group", bargap=0.22, hovermode="x unified",
-                      legend=dict(orientation="h", x=0, y=1.1, font=dict(size=15)),
-                      margin=dict(l=70, r=30, t=60, b=30))
-    fig.update_xaxes(categoryorder="array", categoryarray=xs)
+            fig.add_trace(go.Bar(
+                x=xs, y=ys, name=name,
+                marker=dict(color=color, line=dict(color="#FFFFFF", width=0.8)),
+                hovertemplate=hover))
+    style_fig(fig, 430)
+    fig.update_layout(
+        barmode="group", bargap=0.22, hovermode="closest",
+        margin=dict(l=48, r=14, t=58, b=36),
+    )
+    fig.update_xaxes(categoryorder="array", categoryarray=xs, tickangle=0)
     fig.update_yaxes(title_text=t("note_" + metric).split(" · ")[0])
     plotly_show(fig)
 
@@ -676,7 +746,6 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
     for k, y in row_y.items():
         fig.add_shape(type="rect", x0=1, x1=366, y0=y - 0.36, y1=y + 0.36,
                       fillcolor="#F4F7FB", line=dict(color="#E2E8F0", width=1), layer="below")
-    # 舊年份先畫、今年最後畫（在最上層），同一季節的點放在同一條線上
     for yi, yr in enumerate(years):
         xs, ys, texts = [], [], []
         for k in keys:
@@ -689,7 +758,7 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
         last = (yr == years[-1])
         fig.add_trace(go.Scatter(
             x=xs, y=ys, mode="markers", name=str(yr), text=texts,
-            marker=dict(size=22 if last else 16, color=YEAR_COLORS[yi], opacity=0.95,
+            marker=dict(size=18 if last else 13, color=YEAR_COLORS[yi], opacity=0.95,
                         line=dict(color="#FFFFFF", width=2)),
             hovertemplate=f"<b>{yr}</b> · %{{text}}<extra></extra>"))
     ex, ey, et = [], [], []
@@ -702,37 +771,44 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
     if ex:
         fig.add_trace(go.Scatter(
             x=ex, y=ey, mode="markers", name=t("est_legend"), text=et,
-            marker=dict(size=22, color="#FFFFFF", line=dict(color=ACCENT, width=3.5)),
+            marker=dict(size=18, color="#FFFFFF", line=dict(color=ACCENT, width=3)),
             hovertemplate="%{text}<extra></extra>"))
-    fig.add_vline(x=norm_doy(end), line_width=1.8, line_color="#94A3B8", line_dash="dot",
+    fig.add_vline(x=norm_doy(end), line_width=1.6, line_color="#94A3B8", line_dash="dot",
                   annotation_text=t("today"), annotation_position="bottom right",
-                  annotation_font=dict(size=13, color="#64748B"))
+                  annotation_font=dict(size=12, color="#64748B"))
     for k in keys:
         cur = signals[k].get(years[-1])
         if cur is not None:
-            label = (f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:13px;color:#059669'>"
-                     f"✓ {t('this_year_found')}</span>")
+            label = f"<b>{cur.month}/{cur.day}</b><br><span style='font-size:11.5px;color:#059669'>✓ {t('this_year_found')}</span>"
             color = ACCENT
         elif summary[k]["est"]:
             e = summary[k]["est"]
             n = max(0, (pd.Timestamp(e) - end).days)
-            label = (f"<b>{e.month}/{e.day}</b><br><span style='font-size:13px;color:#B45309'>"
-                     f"{t('est_label')} · {t('days_after', n=n)}</span>")
+            label = f"<b>{e.month}/{e.day}</b><br><span style='font-size:11.5px;color:#B45309'>{t('est_label')} · {t('days_after', n=n)}</span>"
             color = INK
         else:
             label, color = f"<b>{t('not_reached')}</b>", "#94A3B8"
-        fig.add_annotation(xref="paper", x=1.012, xanchor="left", y=row_y[k], yref="y", text=label,
-                           showarrow=False, font=dict(color=color, size=18), align="left")
-    style_fig(fig, 400)
-    fig.update_layout(margin=dict(l=120, r=190, t=50, b=60), hovermode="closest",
-                      legend=dict(orientation="h", x=0, xanchor="left", y=-0.06, font=dict(size=15)))
-    fig.update_xaxes(range=[1, 366], tickmode="array",
-                     tickvals=[date(2001, m, 1).timetuple().tm_yday for m in range(1, 13)],
-                     ticktext=[mlabel(m, lang) for m in range(1, 13)],
-                     showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=14))
-    fig.update_yaxes(range=[-0.6, len(keys) - 0.4], tickmode="array", tickvals=[row_y[k] for k in keys],
-                     ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False,
-                     tickfont=dict(size=16, color="#0F172A"))
+        fig.add_annotation(xref="paper", x=1.015, xanchor="left", y=row_y[k], yref="y", text=label,
+                           showarrow=False, font=dict(color=color, size=14.5), align="left")
+    style_fig(fig, 380)
+    fig.update_layout(
+        margin=dict(l=84, r=135, t=58, b=36),
+        hovermode="closest",
+        legend=dict(orientation="h", x=0, xanchor="left", y=1.15, font=dict(size=13)),
+    )
+    # 手機窄螢幕改每兩個月顯示一個刻度，避免重疊
+    tick_months = [1, 3, 5, 7, 9, 11]
+    fig.update_xaxes(
+        range=[1, 366], tickmode="array",
+        tickvals=[date(2001, m, 1).timetuple().tm_yday for m in tick_months],
+        ticktext=[mlabel(m, lang) for m in tick_months],
+        showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=12.5),
+    )
+    fig.update_yaxes(
+        range=[-0.6, len(keys) - 0.4], tickmode="array", tickvals=[row_y[k] for k in keys],
+        ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False,
+        tickfont=dict(size=14, color="#0F172A"),
+    )
     plotly_show(fig)
 
 
@@ -830,7 +906,6 @@ def pill(v: float, unit: str, dec: int, up_tag: str, down_tag: str, flat_tag: st
 
 
 def segmented(label: str, options: list, key: str, fmt):
-    """優先用 Streamlit 新版分段按鈕；舊版自動退回 radio。"""
     if hasattr(st, "segmented_control"):
         val = st.segmented_control(label, options, default=options[0], key=key,
                                    format_func=fmt, label_visibility="collapsed")

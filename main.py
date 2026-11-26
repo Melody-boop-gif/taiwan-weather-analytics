@@ -6,12 +6,19 @@ from __future__ import annotations
 import html as _html
 from datetime import date, timedelta
 
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
 from plotly.subplots import make_subplots
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import hashlib
+
+import time
+import threading
 
 st.set_page_config(
     page_title="Taiwan Climate BI | 台灣天氣換季商業決策平台",
@@ -19,6 +26,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+try:
+    st.write("Gemini API Key 已讀取：", bool(st.secrets.get("GEMINI_API_KEY", "")))
+except Exception as e:
+    st.error(f"Secrets 讀取錯誤：{type(e).__name__}")
 
 # =============================================================================
 # 設定（想玩的話，先改這一區）
@@ -51,13 +62,15 @@ SEASONS = [
 ]
 
 # 穿著溫度帶：由熱到冷
+
 BANDS = [
-    ("hot", "#E11D48"),
-    ("warm", "#F97316"),
-    ("comf", "#EAB308"),
-    ("cool", "#0EA5E9"),
-    ("cold", "#6366F1"),
+    ("hot", "#DC6C5F"),
+    ("warm", "#E7A776"),
+    ("comf", "#D8CE91"),
+    ("cool", "#8FBAC5"),
+    ("cold", "#8195B1"),
 ]
+
 
 YEAR_COLORS = ["#CBD5E1", "#94A3B8", "#334155", "#E05D38"]  # 舊 → 今年
 ACCENT = "#E05D38"
@@ -120,7 +133,7 @@ T = {
         "wk_max": "週最高溫", "wk_min": "週最低溫",
         "sec2": "02 · 年度基準",
         "sec2_title": "歷年同月份比較",
-        "sec2_sub": "一眼看出今年各月份比歷年偏暖、偏冷，還是偏濕。",
+        "sec2_sub": "各月份比歷年偏暖、偏冷，還是偏濕。",
         "m_temp": "均溫", "m_rain": "雨量", "m_days": "雨天數",
         "note_temp": "月均溫 (°C) · 資料不足 20 天的月份不顯示",
         "note_rain": "月降雨量 (mm) · 資料不足 20 天的月份不顯示",
@@ -433,7 +446,8 @@ header[data-testid="stHeader"] { background: transparent !important; }
   box-shadow: 0 10px 28px -6px rgba(15,23,42,.35);
 }
 .exec-left { display: flex; align-items: center; gap: 16px; }
-.exec-logo { font-size: 32px; line-height: 1; }
+
+.exec-logo {font-size:28px;line-height:1;color:#FFFFFF!important;white-space:nowrap;}
 .exec-sub { font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; color: #FF9A78; font-weight: 700; }
 .exec-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -.01em; margin-top: 2px; }
 .exec-live {
@@ -526,13 +540,15 @@ header[data-testid="stHeader"] { background: transparent !important; }
 .tag-none { background: #F1F5F9; color: #64748B; padding: 4px 11px; border-radius: 7px; font-size: 14px; font-family: var(--font-sans); }
 
 /* 熱力圖 */
-.heat { width: 100%; border-collapse: separate; border-spacing: 7px; table-layout: fixed; padding: 12px 14px; min-width: 980px; }
-.heat th { font-size: 15px; font-weight: 800; color: #334155; text-align: center; padding-bottom: 6px; }
-.heat th:first-child { width: 240px; text-align: left; }
-.heat td.lab { width: 240px; text-align: left; padding-right: 12px; }
-.heat .bn { font-size: 17px; font-weight: 800; color: #0F172A; }
-.heat .bi { font-size: 13.5px; color: #64748B; margin-top: 2px; line-height: 1.4; }
-.heat td.cell { height: 58px; border-radius: 10px; text-align: center; font-size: 15.5px; font-weight: 800; font-family: var(--font-mono); border: 1px solid rgba(0,0,0,.04); }
+.table-scroll:has(.heat) {border:none!important;background:transparent!important;overflow-x:auto;}
+.table-scroll .heat {width:100%;min-width:980px;border-collapse:separate!important;border-spacing:6px!important;table-layout:fixed;padding:0!important;}
+.heat th,.heat td {border:none!important;outline:none!important;}
+.heat th:first-child,.heat td.lab {width:220px!important;background:transparent!important;}
+.heat td.cell {height:58px;border-radius:9px!important;background-clip:padding-box;}
+.heat .bn {font-size:17px;font-weight:800;}
+.heat .bi {font-size:13px;color:#64748B;}
+
+
 
 .footnote { font-size: 14px; color: #64748B; margin: 8px 4px 40px; line-height: 1.8; }
 
@@ -602,6 +618,12 @@ button[data-testid="stBaseButton-segmented_controlActive"] p { color: #FFFFFF !i
   .st-key-ai_float button p { font-size: 14px !important; }
   [data-testid="stPopoverBody"] { min-width: 88vw !important; max-width: 92vw !important; }
 }
+
+/* 隱藏 Plotly X 軸滑鼠日期標籤 */
+.js-plotly-plot .hoverlayer .axistext {
+    display: none !important;
+}
+
 </style>
 """
 
@@ -666,73 +688,145 @@ def section_header(eyebrow: str, title: str, sub: str) -> None:
         unsafe_allow_html=True)
 
 
+
 def plot_weekly(df: pd.DataFrame, rng: str, t) -> None:
-    d = df
+    d = df.copy()
     if rng == "1y":
-        d = df[df.date >= df.date.max() - pd.DateOffset(years=1)]
+        d = d[d.date >= d.date.max() - pd.DateOffset(years=1)]
     elif rng == "6m":
-        d = df[df.date >= df.date.max() - pd.DateOffset(months=6)]
+        d = d[d.date >= d.date.max() - pd.DateOffset(months=6)]
+
     w = d.set_index("date").resample("7D").agg(
-        tmean=("tmean", "mean"), tmax=("tmax", "max"), tmin=("tmin", "min"), rain=("rain", "sum")
+        tmean=("tmean", "mean"), tmax=("tmax", "max"),
+        tmin=("tmin", "min"), rain=("rain", "sum")
     ).reset_index()
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.66, 0.34], vertical_spacing=0.08)
-    fig.add_trace(go.Scatter(
-        x=w.date, y=w.tmin, mode="lines", line=dict(width=0), showlegend=False,
-        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_min") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
-    fig.add_trace(go.Scatter(
-        x=w.date, y=w.tmax, mode="lines", line=dict(width=0), fill="tonexty",
-        fillcolor="rgba(224,93,56,0.14)", name=t("wk_range"),
-        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_max") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
-    fig.add_trace(go.Scatter(
-        x=w.date, y=w.tmean, mode="lines", line=dict(color=ACCENT, width=3), name=t("wk_avg"),
-        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_avg") + "：<b>%{y:.1f}°C</b><extra></extra>"), row=1, col=1)
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
     fig.add_trace(go.Bar(
         x=w.date, y=w.rain, name=t("wk_rain"),
-        marker=dict(color="rgba(14,165,233,0.6)", line=dict(color="rgba(2,132,199,0.85)", width=0.5)),
-        hovertemplate="%{x|%Y/%m/%d}<br>" + t("wk_rain") + "：<b>%{y:.0f} mm</b><extra></extra>"), row=2, col=1)
+        marker_color="rgba(122,170,205,0.45)",
+        marker_line_width=0,
+        legendrank=3,
+        hovertemplate="%{x|%Y/%m/%d}<br>週降雨量：%{y:.1f} mm<extra></extra>"
+    ), secondary_y=True)
 
-    style_fig(fig, 480)
-    fig.update_layout(hovermode="closest", bargap=0.2, margin=dict(l=48, r=14, t=58, b=28))
-    tmin, tmax = float(w.tmin.min()), float(w.tmax.max())
-    fig.update_yaxes(range=[np.floor(tmin) - 2, np.ceil(tmax) + 2], title_text=t("temp_axis"), row=1, col=1)
-    fig.update_yaxes(range=[0, max(30.0, float(w.rain.max()) * 1.1)], title_text=t("rain_axis"), row=2, col=1)
+    fig.add_trace(go.Scatter(
+        x=w.date, y=w.tmin, mode="lines",
+        line=dict(width=0), showlegend=False, hoverinfo="skip"
+    ), secondary_y=False)
+
+    fig.add_trace(go.Scatter(
+        x=w.date, y=w.tmax, mode="lines",
+        line=dict(width=0), fill="tonexty",
+        fillcolor="rgba(224,93,56,0.14)",
+        name=t("wk_range"), legendrank=2,
+        hoverinfo="skip", showlegend=True
+    ), secondary_y=False)
+
+    fig.add_trace(go.Scatter(
+        x=w.date, y=w.tmean, mode="lines",
+        line=dict(color="#E05D38", width=2.5),
+        name=t("wk_avg"), legendrank=1,
+        hovertemplate="%{x|%Y/%m/%d}<br>週均溫：%{y:.1f}°C<extra></extra>"
+    ), secondary_y=False)
+
+
+
+    style_fig(fig, 440)
+    fig.update_layout(
+        hovermode="x",
+        bargap=0.15,
+        margin=dict(l=48, r=48, t=58, b=38),
+        legend=dict(orientation="h", x=0, y=1.12)
+    )
+    fig.update_xaxes(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikedash="solid",
+        spikecolor="#94A3B8",
+        spikethickness=1
+    )
+
+
+
+
+
+
+    fig.update_yaxes(
+        title_text=t("rain_axis"),
+        range=[0, max(30, w.rain.max() * 2.2)],
+        showgrid=False, secondary_y=True
+    )
     plotly_show(fig)
 
 
-def plot_monthly(monthly: pd.DataFrame, years: list[int], metric: str, lang: str, t) -> None:
+
+
+def plot_monthly(monthly: pd.DataFrame, years: list[int], metric: str, lang: str, t, as_bar=False) -> None:
     col = {"temp": "temp", "rain": "rain", "days": "days"}[metric]
     unit = {"temp": "°C", "rain": " mm", "days": " " + t("day_unit").strip()}[metric]
     fig = go.Figure()
-    xs = [mlabel(m, lang) for m in range(1, 13)]
+    xs = list(range(1, 13))
+    labels = [mlabel(m, lang) for m in xs]
+
     for i, y in enumerate(years):
-        cur = monthly[monthly.year == y].set_index("month").reindex(range(1, 13))
+        cur = monthly[monthly.year == y].set_index("month").reindex(xs)
         ys = cur[col].to_numpy()
         name = f"{y}{t('year_suffix')}"
-        fmt = ".1f" if metric != "days" else ".0f"
-        hover = f"<b>{name}</b> · %{{x}}<br>%{{y:{fmt}}}{unit}<extra></extra>"
         color = YEAR_COLORS[i]
-        if metric == "temp":
-            last = (y == years[-1])
+        fmt = ".0f" if metric == "days" else ".1f"
+        hover = f"<b>{name}%{{customdata}}：%{{y:{fmt}}}{unit}</b><extra></extra>"
+
+
+        if not as_bar:
+            last = y == years[-1]
             fig.add_trace(go.Scatter(
-                x=xs, y=ys, name=name, mode="lines+markers", line_shape="spline",
+                x=xs, y=ys, customdata=labels,
+                name=name, mode="lines+markers",
+                line_shape="spline",
                 line=dict(color=color, width=3.8 if last else 2.2),
-                marker=dict(size=8 if last else 5, color="#FFFFFF" if last else color,
-                            line=dict(width=2.5 if last else 0, color=color)),
-                connectgaps=False, hovertemplate=hover))
+                marker=dict(
+                    size=8 if last else 5,
+                    color="#FFFFFF" if last else color,
+                    line=dict(width=2.5 if last else 0, color=color)
+                ),
+                connectgaps=False,
+                hovertemplate=hover
+            ))
         else:
             fig.add_trace(go.Bar(
-                x=xs, y=ys, name=name,
+                x=xs, y=ys, customdata=labels,
+                name=name,
                 marker=dict(color=color, line=dict(color="#FFFFFF", width=0.8)),
-                hovertemplate=hover))
+                hovertemplate=hover
+            ))
+
     style_fig(fig, 430)
     fig.update_layout(
-        barmode="group", bargap=0.22, hovermode="closest",
-        margin=dict(l=48, r=14, t=58, b=36),
+        barmode="group",
+        bargap=0.22,
+        hovermode="x",
+        hoverdistance=100,
+        margin=dict(l=48, r=14, t=58, b=36)
     )
-    fig.update_xaxes(categoryorder="array", categoryarray=xs, tickangle=0)
+    fig.update_xaxes(
+        type="linear",
+        range=[0.5, 12.5],
+        tickmode="array",
+        tickvals=xs,
+        ticktext=labels,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikedash="solid",
+        spikecolor="#94A3B8",
+        spikethickness=1
+    )
     fig.update_yaxes(title_text=t("note_" + metric).split(" · ")[0])
     plotly_show(fig)
+
 
 
 def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timestamp, lang: str, t) -> None:
@@ -796,13 +890,15 @@ def plot_timeline(signals: dict, summary: dict, years: list[int], end: pd.Timest
         ),
     )
     fig.update_traces(cliponaxis=False)
-    tick_months = [1, 4, 7, 10]
+    tick_months = list(range(1, 13))
     fig.update_xaxes(
         range=[1, 366], tickmode="array", tickangle=0,
         tickvals=[date(2001, m, 1).timetuple().tm_yday for m in tick_months],
         ticktext=[mlabel(m, lang) for m in tick_months],
-        showgrid=True, gridcolor="#EDF1F6", side="top", tickfont=dict(size=12),
+        showgrid=True, gridcolor="#EDF1F6", side="top",
+        tickfont=dict(size=11, color="#64748B"),
     )
+
     fig.update_yaxes(
         range=[-0.6, len(keys) - 0.4], tickmode="array", tickvals=[row_y[k] for k in keys],
         ticktext=[f"<b>{t(k)}</b>" for k in keys], showgrid=False,
@@ -885,12 +981,13 @@ def heatmap_html(df: pd.DataFrame, lang: str, t) -> str:
         for m in range(1, 13):
             v = pct.loc[m, key]
             if pd.isna(v) or v < 0.5:
-                bg, txt, tc = "#F6F8FB", "—", "#94A3B8"
+                bg, txt, tc = "#F4F3F1", "", "#0F172A"
             else:
-                alpha = min(0.92, 0.16 + (v / 100) * 0.76)
+                alpha = min(0.95, 0.14 + (v / 100) * 0.95)
                 bg = f"rgba({r},{g},{b},{alpha:.3f})"
                 txt = f"{int(round(v))}%"
-                tc = "#FFFFFF" if alpha > 0.5 else "#0F172A"
+                tc = "#FFFFFF" if key in ("hot", "cool", "cold") and v >= 45 else "#0F172A"
+
             h += f'<td class="cell" style="background:{bg};color:{tc};">{txt}</td>'
         h += "</tr>"
     return h + "</tbody></table>"
@@ -935,22 +1032,76 @@ def build_ai_context(city: str, metrics: dict, signals, summary, years, monthly)
     return "\n".join(lines)
 
 
+DAILY_LIMIT = 200            # all visitors together, per day
+PAUSE_SECONDS = 30 * 60      # after a 429, pause for 30 minutes
+
+
+# One shared record for all visitors. It lives until the app restarts.
+@st.cache_resource
+def get_ai_state():
+    return {"day": "", "count": 0, "paused_until": 0.0, "answers": {}, "lock": threading.Lock()}
+
+
 def ai_reply(question: str, context: str, t) -> str:
     try:
         key = st.secrets.get("GEMINI_API_KEY", "")
-        model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+        model = st.secrets.get("GEMINI_MODEL", "gemini-3.8-flash")
     except Exception:
-        key, model = "", "gemini-2.5-flash"
+        key, model = "", "gemini-3.8-flash"
     if not key or key == "your-gemini-key-here":
         return t("ai_unavailable")
+
+    state = get_ai_state()
+    cache_key = question.strip().lower() + "|" + str(hash(context))
+
+    with state["lock"]:
+        # Reset the counter when a new day starts (Taiwan time)
+        day_now = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
+        if state["day"] != day_now:
+            state["day"] = day_now
+            state["count"] = 0
+
+        # Same question and same data: reuse the saved answer (not counted)
+        if cache_key in state["answers"]:
+            return state["answers"][cache_key]
+
+        # Stop 1: today's 200 questions are used
+        if state["count"] >= DAILY_LIMIT:
+            return "今日 AI 問答已達 200 次上限,明天再試。"
+
+        # Stop 2: Google said the free quota is used up a moment ago
+        if time.time() < state["paused_until"]:
+            return "今日 AI 免費額度已用完,請稍後或明天再試。"
+
+        # Count BEFORE calling, so failed calls also count
+        state["count"] += 1
+
     try:
         from google import genai
         client = genai.Client(api_key=key)
         resp = client.models.generate_content(
-            model=model, contents=f"{t('ai_context')}\n\nDATA:\n{context}\n\nQUESTION:\n{question}")
-        return resp.text or t("ai_error", e="empty response")
+            model=model,
+            contents=f"{t('ai_context')}\n\nDATA:\n{context}\n\nQUESTION:\n{question}",
+            config={"max_output_tokens": 1000},
+        )
+        answer = resp.text
+        if not answer:
+            return t("ai_error", e="empty response")
+
+        # Save the answer; clear the saved answers if there are too many
+        with state["lock"]:
+            if len(state["answers"]) > 200:
+                state["answers"].clear()
+            state["answers"][cache_key] = answer
+        return answer
     except Exception as e:
-        return t("ai_error", e=str(e))
+        text = str(e)
+        # Google says the quota is used up: pause, then try again later
+        if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+            with state["lock"]:
+                state["paused_until"] = time.time() + PAUSE_SECONDS
+            return "今日 AI 免費額度已用完,請稍後或明天再試。"
+        return t("ai_error", e=text)
 
 
 def set_question(text: str) -> None:
@@ -980,14 +1131,16 @@ with col_city:
         format_func=lambda k: CITIES[k][0] if lang == "zh" else k)
 with col_brand:
     st.markdown(
-        '<div class="exec-nav-bar"><div class="exec-left"><div class="exec-logo">🌤</div><div>'
+
+
+        '<div class="exec-nav-bar"><div class="exec-left"><div class="exec-logo">☀︎ ☁︎</div><div>'
         '<div class="exec-sub">RETAIL CLIMATE INTELLIGENCE SYSTEM</div>'
         '<div class="exec-title">Taiwan Weather Analytics</div></div></div>'
         f'<div class="exec-live">● {esc(t("live"))}</div></div>',
         unsafe_allow_html=True)
 
 # ---- 取資料 ----
-today = date.today()
+today = datetime.now(ZoneInfo("Asia/Taipei")).date()
 end_req = today - timedelta(days=DATA_LAG_DAYS)
 start_req = date(end_req.year - 3, 1, 1)
 try:
@@ -1116,15 +1269,33 @@ with st.container(key="sec1"):
         rng = segmented("range", ["all", "1y", "6m"], "rng", lambda x: t("rng_" + x))
     plot_weekly(df, rng, t)
 
+
+
+
+
+
 # ---- 02 年度基準 ----
 with st.container(key="sec2"):
-    col_a, col_b = st.columns([2.6, 1.4], vertical_alignment="center")
-    with col_a:
-        section_header(t("sec2"), t("sec2_title"), t("sec2_sub"))
-    with col_b:
-        metric = segmented("metric", ["temp", "rain", "days"], "metric", lambda x: t("m_" + x))
-    plot_monthly(monthly, years, metric, lang, t)
-    st.markdown(f'<div class="note-right">{esc(t("note_" + metric))}</div>', unsafe_allow_html=True)
+    section_header(t("sec2"), t("sec2_title"), t("sec2_sub"))
+    c1, c2 = st.columns([5, 2], vertical_alignment="center")
+    with c1:
+        st.markdown("**📈 月份趨勢折線圖**" if lang == "zh" else "**📈 Monthly Trend**")
+    with c2:
+        line_metric = st.segmented_control("line_metric", ["temp", "rain", "days"], default="temp", key="line_metric", format_func=lambda x: t("m_" + x), label_visibility="collapsed")
+    plot_monthly(monthly, years, line_metric or "temp", lang, t, as_bar=False)
+    st.divider()
+    c3, c4 = st.columns([5, 2], vertical_alignment="center")
+    with c3:
+        st.markdown("**📊 月份比較長條圖**" if lang == "zh" else "**📊 Monthly Bar Chart**")
+    with c4:
+        bar_metric = st.segmented_control("bar_metric", ["temp", "rain", "days"], default="rain", key="bar_metric_new", format_func=lambda x: t("m_" + x), label_visibility="collapsed")
+    plot_monthly(monthly, years, bar_metric or "rain", lang, t, as_bar=True)
+
+
+
+
+
+
 
 # ---- 03 換季時序 ----
 with st.container(key="sec3"):

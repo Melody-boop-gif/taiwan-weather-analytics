@@ -21,37 +21,54 @@ import time
 import threading
 
 st.set_page_config(
-    page_title="Taiwan Climate BI | 台灣天氣換季商業決策平台",
+    page_title="Taiwan Weather Analytics",
     page_icon="🌤",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-try:
-    st.write("Gemini API Key 已讀取：", bool(st.secrets.get("GEMINI_API_KEY", "")))
-except Exception as e:
-    st.error(f"Secrets 讀取錯誤：{type(e).__name__}")
 
-# =============================================================================
-# 設定（想玩的話，先改這一區）
-# =============================================================================
+
+
+
 API_URL = "https://archive-api.open-meteo.com/v1/archive"
-DATA_LAG_DAYS = 3          # 歷史資料約晚 3 天
+DATA_LAG_DAYS = 0
 RAINY_MM = 1.0             # 雨天定義：日雨量 >= 1mm
-MIN_DAYS_PER_MONTH = 20    # 資料不足 20 天的月份不顯示
+MIN_DAYS_PER_MONTH = 1
 
 CITIES = {
+    # 北部
     "Taipei": ("台北市", "north", 25.0330, 121.5654),
     "New Taipei": ("新北市", "north", 25.0120, 121.4650),
+    "Keelung": ("基隆市", "north", 25.1276, 121.7392),
     "Taoyuan": ("桃園市", "north", 24.9936, 121.3010),
-    "Hsinchu": ("新竹市", "north", 24.8039, 120.9647),
-    "Yilan": ("宜蘭縣", "east", 24.7570, 121.7530),
+    "Hsinchu City": ("新竹市", "north", 24.8039, 120.9647),
+    "Hsinchu County": ("新竹縣", "north", 24.8387, 121.0177),
+
+    # 中部
+    "Miaoli": ("苗栗縣", "central", 24.5602, 120.8214),
     "Taichung": ("台中市", "central", 24.1477, 120.6736),
-    "Chiayi": ("嘉義市", "south", 23.4801, 120.4491),
+    "Changhua": ("彰化縣", "central", 24.0753, 120.5416),
+    "Nantou": ("南投縣", "central", 23.9609, 120.9719),
+    "Yunlin": ("雲林縣", "central", 23.7092, 120.4313),
+
+    # 南部
+    "Chiayi City": ("嘉義市", "south", 23.4801, 120.4491),
+    "Chiayi County": ("嘉義縣", "south", 23.4594, 120.2947),
     "Tainan": ("台南市", "south", 22.9999, 120.2270),
     "Kaohsiung": ("高雄市", "south", 22.6273, 120.3014),
+    "Pingtung": ("屏東縣", "south", 22.6761, 120.4942),
+
+    # 東部
+    "Yilan": ("宜蘭縣", "east", 24.7570, 121.7530),
     "Hualien": ("花蓮縣", "east", 23.9772, 121.6044),
     "Taitung": ("台東縣", "east", 22.7583, 121.1444),
+
+    # 離島
+    "Penghu": ("澎湖縣", "islands", 23.5655, 119.5863),
+    "Kinmen": ("金門縣", "islands", 24.4494, 118.3767),
+    "Lienchiang": ("連江縣", "islands", 26.1602, 119.9499),
 }
+
 
 # 換季訊號：(key, 門檻°C, 方向, 搜尋起算 (月,日))   ← 想改門檻就改這裡的數字
 SEASONS = [
@@ -84,7 +101,11 @@ T = {
         "live": "即時氣候資料",
         "data_until": "資料更新至 {d}",
         "choose_city": "選擇觀測城市",
-        "north": "北部地區", "central": "中部地區", "south": "南部地區", "east": "東部地區",
+        "north": "北部地區",
+        "central": "中部地區",
+        "south": "南部地區",
+        "east": "東部地區",
+        "islands": "離島地區",
         "base_period": "分析期間 {a}–{b}",
         "hero_desc": "以近 3 年每日氣溫與降雨資料，找出換季節奏與歷年差異，作為服飾商品上架、備貨、檔期與庫存調度的量化依據。",
         "progress_title": "今年換季進度",
@@ -135,8 +156,8 @@ T = {
         "sec2_title": "歷年同月份比較",
         "sec2_sub": "各月份比歷年偏暖、偏冷，還是偏濕。",
         "m_temp": "均溫", "m_rain": "雨量", "m_days": "雨天數",
-        "note_temp": "月均溫 (°C) · 資料不足 20 天的月份不顯示",
-        "note_rain": "月降雨量 (mm) · 資料不足 20 天的月份不顯示",
+        "note_temp": "月均溫 (°C)",
+        "note_rain": "月降雨量 (mm)",
         "note_days": "月降雨天數 (天) · 日雨量 ≥ 1mm 才算雨天",
         "year_suffix": "年",
         "sec3": "03 · 換季時序",
@@ -175,7 +196,16 @@ T = {
         "ai_thinking": "AI 顧問分析中…",
         "ai_unavailable": "尚未設定 GEMINI_API_KEY。請在 .streamlit/secrets.toml 加入 GEMINI_API_KEY = \"你的金鑰\" 後重新啟動。",
         "ai_error": "AI 回覆失敗：{e}",
-        "ai_context": "你是資深零售服飾品牌的氣象商業顧問。請只根據下方提供的氣候資料，給出精準、客觀、具商業價值的建議，語氣沉穩專業，使用繁體中文。",
+        "ai_context": (
+            "你是氣象資料分析助理。"
+            "使用者可以自由詢問天氣、氣溫、降雨、歷年比較及換季問題。"
+            "請優先根據提供的網站資料進行分析與計算。"
+            "回答時引用具體年份、日期及數值。"
+            "若使用者詢問服飾或商業決策，可以提出相關建議。"
+            "不要編造資料中不存在的數據。"
+            "如果資料不足以回答，請清楚說明。"
+            "請使用繁體中文回答。"
+        ),
         "load_error": "氣象資料讀取失敗，請確認網路連線：{e}",
         "loading": "正在從 Open-Meteo 取得歷史氣象資料…",
         "no_data": "樣本資料不足",
@@ -185,7 +215,11 @@ T = {
         "live": "LIVE CLIMATE DATA",
         "data_until": "Data through {d}",
         "choose_city": "Select city",
-        "north": "Northern Region", "central": "Central Region", "south": "Southern Region", "east": "Eastern Region",
+        "north": "Northern Region",
+        "central": "Central Region",
+        "south": "Southern Region",
+        "east": "Eastern Region",
+        "islands": "Offshore Islands",
         "base_period": "Analysis period {a}–{b}",
         "hero_desc": "Three years of daily temperature and rainfall used to find the seasonal rhythm and year-over-year shifts, as a quantitative basis for apparel launches, stocking, campaign timing and inventory allocation.",
         "progress_title": "This year's season progress",
@@ -236,8 +270,8 @@ T = {
         "sec2_title": "Same-month comparison across years",
         "sec2_sub": "See at a glance whether this year runs warmer, cooler or wetter than past years.",
         "m_temp": "Temp", "m_rain": "Rainfall", "m_days": "Rainy days",
-        "note_temp": "Monthly mean (°C) · months with <20 days of data are hidden",
-        "note_rain": "Monthly rainfall (mm) · months with <20 days of data are hidden",
+        "note_temp": "Monthly mean (°C)",
+        "note_rain": "Monthly rainfall (mm)",
         "note_days": "Rainy days per month · a rainy day is ≥ 1mm",
         "year_suffix": "",
         "sec3": "03 · SEASON TIMING",
@@ -250,7 +284,7 @@ T = {
         "status_reached": "Reached", "status_proj": "Projected",
         "not_reached": "Not yet",
         "this_year_found": "Triggered this year",
-        "est_label": "Est.",
+        "est_label": "Estimated",
         "days_after": "in {n} days",
         "today": "Data cutoff",
         "sec4": "04 · MERCHANDISE PLANNING",
@@ -343,8 +377,7 @@ def monthly_table(df: pd.DataFrame) -> pd.DataFrame:
     g = d.groupby(["year", "month"]).agg(
         temp=("tmean", "mean"), rain=("rain", "sum"), days=("rainy", "sum"), n=("tmean", "size")
     ).reset_index()
-    for c in ("temp", "rain", "days"):
-        g.loc[g.n < MIN_DAYS_PER_MONTH, c] = np.nan
+
     return g
 
 
@@ -1012,101 +1045,177 @@ def segmented(label: str, options: list, key: str, fmt):
 # =============================================================================
 # AI
 # =============================================================================
-def build_ai_context(city: str, metrics: dict, signals, summary, years, monthly) -> str:
+
+def build_ai_context(city, metrics, signals, summary, years, monthly, df):
+    end = df["date"].max()
+    recent = df[df["date"] >= end - pd.Timedelta(days=29)]
+
     lines = [
-        f"Location: {CITIES[city][0]} / {city}",
-        f"Latest observation: {metrics['end'].date().isoformat()}",
-        f"Last 30 days: mean temp {metrics['temp']:.1f} C, rainfall {metrics['rain']:.0f} mm, rainy days {metrics['days']}.",
+        f"分析縣市：{CITIES[city][0]}",
+        f"資料截止日：{end.date()}",
+        f"資料起始日：{df['date'].min().date()}",
+        f"有效氣象資料天數：{len(df)}",
+        f"近30天平均氣溫：{metrics['temp']:.1f}°C",
+        f"近30天累積降雨量：{metrics['rain']:.1f}mm",
+        f"近30天雨天數：{metrics['days']}天",
     ]
+
     if metrics["temp_prev"] is not None:
-        lines.append(f"Same window last year: mean temp {metrics['temp_prev']:.1f} C, "
-                     f"rainfall {metrics['rain_prev']:.0f} mm, rainy days {metrics['days_prev']}.")
-    lines.append("Rainy day = daily rain >= 1.0mm. Season transition = first day the 7-day rolling mean crossed the threshold.")
-    for k, thr, direction, _ in SEASONS:
-        parts = [f"{y}: {signals[k][y].date()}" if signals[k][y] is not None else f"{y}: not reached" for y in years]
-        avg = summary[k]["avg_md"]
-        lines.append(f"{k} (threshold {'>=' if direction == 'up' else '<'} {thr} C): " + "; ".join(parts)
-                     + (f"; historical avg {avg[0]}/{avg[1]}" if avg else ""))
-    for _, r in monthly.dropna(subset=["temp"]).tail(24).iterrows():
-        lines.append(f"{int(r.year)}-{int(r.month):02d}: mean {r.temp:.1f} C, rain {r.rain:.0f} mm, rainy days {r.days:.0f}")
+        lines.extend([
+            f"去年同期30天平均氣溫：{metrics['temp_prev']:.1f}°C",
+            f"去年同期30天累積降雨：{metrics['rain_prev']:.1f}mm",
+            f"去年同期雨天數：{metrics['days_prev']}天",
+        ])
+
+    lines.append("\n【歷年換季分析】")
+
+    for key, threshold, direction, _ in SEASONS:
+        condition = ">=" if direction == "up" else "<"
+        lines.append(f"{key}：7日均溫 {condition} {threshold}°C")
+
+        for year in years:
+            value = signals[key].get(year)
+            lines.append(
+                f"{year}年：{value.date() if value is not None else '尚未觸發'}"
+            )
+
+        avg = summary[key]["avg_md"]
+        if avg:
+            lines.append(f"程式計算的換季日期平均：{avg[0]}/{avg[1]}")
+
+    lines.append("\n【全部月份統計】")
+
+    for _, r in monthly.iterrows():
+        lines.append(
+            f"{int(r['year'])}/{int(r['month']):02d}："
+            f"均溫 {r['temp']:.1f}°C，"
+            f"累積降雨 {r['rain']:.1f}mm，"
+            f"雨天 {int(r['days'])}天，"
+            f"有效資料 {int(r['n'])}天"
+        )
+
+    lines.append("\n【最近30天每日天氣】")
+
+    for _, r in recent.iterrows():
+        lines.append(
+            f"{r['date'].date()}："
+            f"均溫 {r['tmean']:.1f}°C，"
+            f"最高 {r['tmax']:.1f}°C，"
+            f"最低 {r['tmin']:.1f}°C，"
+            f"降雨 {r['rain']:.1f}mm"
+        )
+
     return "\n".join(lines)
 
 
-DAILY_LIMIT = 200            # all visitors together, per day
-PAUSE_SECONDS = 30 * 60      # after a 429, pause for 30 minutes
 
 
-# One shared record for all visitors. It lives until the app restarts.
+
+
+
+
+DAILY_LIMIT = 3
+PAUSE_SECONDS = 30 * 60
+
 @st.cache_resource
 def get_ai_state():
-    return {"day": "", "count": 0, "paused_until": 0.0, "answers": {}, "lock": threading.Lock()}
+    return {
+        "day": "",
+        "count": 0,
+        "paused_until": 0.0,
+        "answers": {},
+        "lock": threading.Lock()
+    }
 
 
 def ai_reply(question: str, context: str, t) -> str:
     try:
-        key = st.secrets.get("GEMINI_API_KEY", "")
-        model = st.secrets.get("GEMINI_MODEL", "gemini-3.8-flash")
+        key = st.secrets.get("OPENAI_API_KEY", "")
+        model = st.secrets.get("OPENAI_MODEL", "gpt-6-luna")
     except Exception:
-        key, model = "", "gemini-3.8-flash"
-    if not key or key == "your-gemini-key-here":
-        return t("ai_unavailable")
+        key, model = "", "gpt-6-luna"
+
+    if not key:
+        return "尚未設定 OPENAI_API_KEY，請檢查 secrets.toml。"
 
     state = get_ai_state()
-    cache_key = question.strip().lower() + "|" + str(hash(context))
+    cache_key = hashlib.sha256(
+        (question.strip().lower() + "|" + context + "|" + model).encode("utf-8")
+    ).hexdigest()
 
     with state["lock"]:
-        # Reset the counter when a new day starts (Taiwan time)
-        day_now = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
-        if state["day"] != day_now:
-            state["day"] = day_now
-            state["count"] = 0
+        today = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
 
-        # Same question and same data: reuse the saved answer (not counted)
+        if state["day"] != today:
+            state["day"] = today
+            state["count"] = 0
+            state["paused_until"] = 0.0
+
         if cache_key in state["answers"]:
             return state["answers"][cache_key]
 
-        # Stop 1: today's 200 questions are used
         if state["count"] >= DAILY_LIMIT:
-            return "今日 AI 問答已達 200 次上限,明天再試。"
+            return "今日 AI 問答已達 3 次上限，請明天再試。"
 
-        # Stop 2: Google said the free quota is used up a moment ago
         if time.time() < state["paused_until"]:
-            return "今日 AI 免費額度已用完,請稍後或明天再試。"
+            return "AI 服務暫時受到限制，請稍後再試。"
 
-        # Count BEFORE calling, so failed calls also count
         state["count"] += 1
 
     try:
-        from google import genai
-        client = genai.Client(api_key=key)
-        resp = client.models.generate_content(
-            model=model,
-            contents=f"{t('ai_context')}\n\nDATA:\n{context}\n\nQUESTION:\n{question}",
-            config={"max_output_tokens": 1000},
-        )
-        answer = resp.text
-        if not answer:
-            return t("ai_error", e="empty response")
+        from openai import OpenAI
 
-        # Save the answer; clear the saved answers if there are too many
+        client = OpenAI(
+            api_key=key,
+            max_retries=0,
+            timeout=30.0
+        )
+
+        response = client.responses.create(
+            model=model,
+            instructions=t("ai_context"),
+            input=f"DATA:\n{context}\n\nQUESTION:\n{question}",
+            max_output_tokens=1500,
+            store=False
+        )
+
+        answer = response.output_text
+
+        if not answer:
+            status = response.status
+            reason = (
+                response.incomplete_details.reason
+                if response.incomplete_details else "unknown"
+            )
+            return f"AI 未產生文字。狀態：{status}，原因：{reason}"
+
+
+
         with state["lock"]:
-            if len(state["answers"]) > 200:
+            if len(state["answers"]) >= 200:
                 state["answers"].clear()
+
             state["answers"][cache_key] = answer
+
         return answer
+
     except Exception as e:
-        text = str(e)
-        # Google says the quota is used up: pause, then try again later
-        if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+        from openai import RateLimitError, APIStatusError
+
+        if isinstance(e, RateLimitError):
             with state["lock"]:
                 state["paused_until"] = time.time() + PAUSE_SECONDS
-            return "今日 AI 免費額度已用完,請稍後或明天再試。"
-        return t("ai_error", e=text)
+            return "AI 請求達到限制，請稍後再試。"
+
+        if isinstance(e, APIStatusError) and e.status_code >= 500:
+            return "AI 服務暫時繁忙，請稍後再試。"
+
+        return f"AI 回覆失敗：{type(e).__name__}，請檢查 API 設定。"
+
 
 
 def set_question(text: str) -> None:
     st.session_state["ai_q"] = text
-
 
 # =============================================================================
 # 主畫面
@@ -1116,7 +1225,13 @@ st.markdown(CSS, unsafe_allow_html=True)
 # ---- 頂部：品牌列（左）＋ 城市 / 語言（右）同一排 ----
 col_brand, col_city, col_lang = st.columns([5, 1.7, 1.4], vertical_alignment="center")
 with col_lang:
-    lang_choice = st.selectbox("Language", ["繁體中文", "English"], key="ui_lang", label_visibility="collapsed")
+    lang_choice = st.selectbox(
+        "Language",
+        ["繁體中文", "English"],
+        index=1,
+        key="ui_lang",
+        label_visibility="collapsed"
+    )
 lang = "zh" if lang_choice == "繁體中文" else "en"
 
 
@@ -1334,7 +1449,7 @@ with st.container(key="ai_float"):
         if st.button(t("ai_send"), key="ai_send"):
             if q.strip():
                 with st.spinner(t("ai_thinking")):
-                    ctx = build_ai_context(city, metrics, signals, summary, years, monthly)
+                    ctx = build_ai_context(city, metrics, signals, summary, years, monthly, df)
                     st.session_state["ai_answer"] = ai_reply(q.strip(), ctx, t)
         if st.session_state.get("ai_answer"):
             st.divider()

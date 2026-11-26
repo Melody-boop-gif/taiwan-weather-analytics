@@ -268,7 +268,7 @@ T = {
         "wk_max": "Weekly high", "wk_min": "Weekly low",
         "sec2": "02 · YEAR-OVER-YEAR",
         "sec2_title": "Same-month comparison across years",
-        "sec2_sub": "See at a glance whether this year runs warmer, cooler or wetter than past years.",
+        "sec2_sub": "See at a gtter than past years.",
         "m_temp": "Temp", "m_rain": "Rainfall", "m_days": "Rainy days",
         "note_temp": "Monthly mean (°C)",
         "note_rain": "Monthly rainfall (mm)",
@@ -952,8 +952,8 @@ def season_rule(key: str, t) -> str:
 
 def rule_grid_html(t) -> str:
     h = '<div class="rule-grid">'
-    for k, *_ in SEASONS:
-        h += (f'<div class="rule-card"><div class="rule-name">{esc(t(k))}</div>'
+    for k, *_ in         h += (f'<div class="rule-card"><div class="rule-name">{esc(t(k))}</div>'SEASONS:
+
               f'<div class="rule-cond">{esc(season_rule(k, t))}</div>'
               f'<div class="rule-items">{esc(t(k + "_items"))}</div></div>')
     return h + "</div>"
@@ -1114,7 +1114,7 @@ def build_ai_context(city, metrics, signals, summary, years, monthly, df):
 
 
 
-DAILY_LIMIT = 3
+DAILY_LIMIT = 10
 PAUSE_SECONDS = 30 * 60
 
 @st.cache_resource

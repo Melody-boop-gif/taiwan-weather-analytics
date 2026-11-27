@@ -1220,6 +1220,7 @@ def ai_reply(question: str, context: str, t) -> str:
 
 def set_question(text: str) -> None:
     st.session_state["ai_q"] = text
+def make_weather_pdf(city, metrics, signals, summary, years, end):
 
 # =============================================================================
 # 主畫面
@@ -1276,6 +1277,15 @@ years = list(range(end.year - 3, end.year + 1))
 metrics = last30_metrics(df)
 monthly = monthly_table(df)
 signals, summary = compute_signals(df, years, end)
+
+st.download_button(
+    "📄 下載 PDF 報告" if lang == "zh" else "📄 Download PDF Report",
+    data=make_weather_pdf(city, metrics, signals, summary, years, end),
+    file_name=f"Taiwan_Weather_{city.replace(' ', '_')}_{end.date()}.pdf",
+    mime="application/pdf",
+    key="weather_pdf_download",
+)
+
 
 # ---- Hero ----
 city_name = CITIES[city][0] if lang == "zh" else city

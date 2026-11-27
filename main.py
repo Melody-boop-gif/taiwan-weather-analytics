@@ -87,9 +87,7 @@ BANDS = [
     ("cool", "#8FBAC5"),
     ("cold", "#8195B1"),
 ]
-
-
-YEAR_COLORS = ["#CBD5E1", "#94A3B8", "#334155", "#E05D38"]  # 舊 → 今年
+YEAR_COLORS = ["#CBD5E1", "#94A3B8", "#334155", "#E05D38"]
 ACCENT = "#E05D38"
 INK = "#0F172A"
 

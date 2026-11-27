@@ -19,6 +19,16 @@ import hashlib
 
 import time
 import threading
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.graphics.shapes import Drawing, Line, String
+from reportlab.graphics.charts.lineplots import LinePlot
 
 st.set_page_config(
     page_title="Taiwan Weather Analytics",
@@ -1215,12 +1225,197 @@ def ai_reply(question: str, context: str, t) -> str:
             return "AI 服務暫時繁忙，請稍後再試。"
 
         return f"AI 回覆失敗：{type(e).__name__}，請檢查 API 設定。"
+# =============================================================================
+# PDF 匯出
+# =============================================================================
+PDF_FONT = "MSung-Light"
+pdfmetrics.registerFont(UnicodeCIDFont(PDF_FONT))
 
+
+def pdf_clean(s) -> str:
+    """CID 字型缺少的符號改成安全字元，並跳脫 XML。"""
+    s = str(s).replace("≥", ">=").replace("●", "").replace("⏱", "").replace("✓", "")
+    return _html.escape(s)
+
+
+def pdf_monthly_chart(monthly, years, metric, title, lang, t):
+    W, H = 175 * mm, 68 * mm
+    d = Drawing(W, H)
+    lp = LinePlot()
+    lp.x, lp.y = 34, 26
+    lp.width, lp.height = W - 50, H - 50
+    data = []
+    for y in years:
+        cur = monthly[monthly.year == y].dropna(subset=[metric])
+        pts = [(int(m), float(v)) for m, v in zip(cur.month, cur[metric])]
+        data.append(pts or [(1, 0.0)])
+    lp.data = data
+    for i in range(len(years)):
+        lp.lines[i].strokeColor = colors.HexColor(YEAR_COLORS[i])
+        lp.lines[i].strokeWidth = 2.4 if i == len(years) - 1 else 1.4
+    lp.xValueAxis.valueMin, lp.xValueAxis.valueMax = 1, 12
+    lp.xValueAxis.valueSteps = list(range(1, 13))
+    lp.xValueAxis.labelTextFormat = "%d"
+    lp.yValueAxis.labelTextFormat = "%.0f"
+    for ax in (lp.xValueAxis, lp.yValueAxis):
+        ax.labels.fontName = PDF_FONT
+        ax.labels.fontSize = 7
+    lp.yValueAxis.gridStrokeColor = colors.HexColor("#E2E8F0")
+    lp.yValueAxis.visibleGrid = True
+    d.add(lp)
+    d.add(String(4, H - 10, pdf_clean(title), fontName=PDF_FONT, fontSize=9,
+                 fillColor=colors.HexColor("#0F172A")))
+    x = W - 4 * 52
+    for i, y in enumerate(years):          # 圖例
+        d.add(Line(x, H - 7, x + 12, H - 7, strokeColor=colors.HexColor(YEAR_COLORS[i]), strokeWidth=2.5))
+        d.add(String(x + 15, H - 10, f"{y}", fontName=PDF_FONT, fontSize=8))
+        x += 52
+    return d
+
+
+def build_pdf(city_name, lang, t, metrics, signals, summary, years, monthly, df, cards) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
+                            topMargin=14 * mm, bottomMargin=14 * mm,
+                            title=f"Taiwan Weather Analytics - {city_name}")
+    ink = colors.HexColor(INK)
+    accent = colors.HexColor(ACCENT)
+    sty = lambda **kw: ParagraphStyle("x", fontName=PDF_FONT, textColor=ink, **kw)
+    s_title = sty(fontSize=22, leading=28)
+    s_sub = sty(fontSize=9.5, leading=14, textColor=colors.HexColor("#64748B"))
+    s_h = sty(fontSize=13, leading=18, spaceBefore=12, spaceAfter=6)
+    s_body = sty(fontSize=9, leading=14, textColor=colors.HexColor("#334155"))
+    s_cell = sty(fontSize=8, leading=10)
+    s_note = sty(fontSize=7.5, leading=11, textColor=colors.HexColor("#64748B"))
+
+    end = df["date"].max()
+    P = lambda txt, st_: Paragraph(pdf_clean(txt), st_)
+    story = []
+
+    # --- 標題 ---
+    story += [
+        P("Taiwan Weather Analytics", sty(fontSize=9, leading=12, textColor=accent)),
+        P(city_name, s_title),
+        P(f"{t('base_period', a=years[0], b=years[-1])}  |  {t('data_until', d=end.date().isoformat())}", s_sub),
+        Spacer(1, 8),
+    ]
+
+    # --- KPI ---
+    def vs(cur, prev, unit, dec):
+        if prev is None:
+            return "—"
+        return t("vs_last", v=f"{prev:.{dec}f}{unit}") + f"  ({cur - prev:+.{dec}f}{unit})"
+
+    kpi = [
+        [P(t("kpi_temp"), s_cell), P(t("kpi_rain"), s_cell), P(t("kpi_days"), s_cell)],
+        [P(f"{metrics['temp']:.1f} °C", sty(fontSize=17, leading=22)),
+         P(f"{metrics['rain']:.0f} mm", sty(fontSize=17, leading=22)),
+         P(f"{metrics['days']} {t('day_unit').strip()}", sty(fontSize=17, leading=22))],
+        [P(vs(metrics["temp"], metrics["temp_prev"], "°C", 1), s_note),
+         P(vs(metrics["rain"], metrics["rain_prev"], "mm", 0), s_note),
+         P(t("vs_last", v=f"{metrics['days_prev']}{t('day_unit')}") if metrics["days_prev"] is not None else "—", s_note)],
+    ]
+    kt = Table(kpi, colWidths=[60 * mm] * 3)
+    kt.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#D5DDE8")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#E2E8F0")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story += [kt]
+
+    # --- 重點摘要 ---
+    story.append(P(t("insights_title"), s_h))
+    for tag, tt, bd in cards:
+        story.append(P(f"[{tag}] {tt}", sty(fontSize=10, leading=15)))
+        story.append(P(bd, s_body))
+        story.append(Spacer(1, 5))
+
+    # --- 換季時序表 ---
+    story.append(P(t("sec3_title"), s_h))
+    head = [t("season")] + [f"{y}{t('year_suffix')}" for y in years] + [t("hist_avg"), t("status")]
+    rows = [[P(h, s_cell) for h in head]]
+    for k, *_ in SEASONS:
+        r = [P(t(k), s_cell)]
+        for y in years:
+            ts = signals[k].get(y)
+            r.append(P(f"{ts.month}/{ts.day}" if ts is not None else t("not_reached"), s_cell))
+        avg = summary[k]["avg_md"]
+        r.append(P(f"{avg[0]}/{avg[1]}" if avg else "—", s_cell))
+        if signals[k].get(years[-1]) is not None:
+            r.append(P(t("status_reached"), s_cell))
+        elif summary[k]["est"]:
+            e = summary[k]["est"]
+            r.append(P(f"{t('status_proj')} {e.month}/{e.day}", s_cell))
+        else:
+            r.append(P("—", s_cell))
+        rows.append(r)
+    n_cols = len(head)
+    st_tbl = Table(rows, colWidths=[30 * mm] + [(150 * mm) / (n_cols - 1)] * (n_cols - 1))
+    st_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CBD5E1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(st_tbl)
+
+    # --- 圖表 ---
+    story.append(P(t("sec2_title"), s_h))
+    story.append(pdf_monthly_chart(monthly, years, "temp", t("note_temp"), lang, t))
+    story.append(Spacer(1, 6))
+    story.append(pdf_monthly_chart(monthly, years, "rain", t("note_rain"), lang, t))
+
+    # --- 溫度帶熱力表 ---
+    story.append(P(t("sec4_title"), s_h))
+    pct = temperature_bands(df)
+    hrows = [[P(t("band_header").split(" / ")[0], s_cell)] + [P(mlabel(m, lang), s_cell) for m in range(1, 13)]]
+    cell_styles = []
+    for ri, (key, color) in enumerate(BANDS, start=1):
+        row = [P(t(key), s_cell)]
+        r_, g_, b_ = hex_rgb(color)
+        for m in range(1, 13):
+            v = pct.loc[m, key]
+            if pd.isna(v) or v < 0.5:
+                row.append("")
+                continue
+            a = min(0.95, 0.14 + (v / 100) * 0.95)
+            blend = colors.Color((255 * (1 - a) + r_ * a) / 255, (255 * (1 - a) + g_ * a) / 255,
+                                 (255 * (1 - a) + b_ * a) / 255)
+            cell_styles.append(("BACKGROUND", (m, ri), (m, ri), blend))
+            row.append(P(f"{int(round(v))}%", s_cell))
+        hrows.append(row)
+    ht = Table(hrows, colWidths=[38 * mm] + [11.5 * mm] * 12)
+    ht.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+        ("GRID", (0, 0), (-1, -1), 1.2, colors.white),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ] + cell_styles))
+    story.append(ht)
+
+    story += [Spacer(1, 10), P(t("footnote"), s_note)]
+    doc.build(story)
+    return buf.getvalue()
 
 
 def set_question(text: str) -> None:
     st.session_state["ai_q"] = text
 
+
+
+# ---- PDF 下載 ----
+try:
+    pdf_bytes = build_pdf(city_name, lang, t, metrics, signals, summary, years, monthly, df, cards)
+    st.download_button(
+        "📄 下載 PDF 報告" if lang == "zh" else "📄 Download PDF report",
+        data=pdf_bytes,
+        file_name=f"weather_{city}_{end.date()}.pdf",
+        mime="application/pdf",
+        key="pdf_dl",
+    )
+except Exception as exc:
+    st.warning(f"PDF 產生失敗：{exc}")
 # =============================================================================
 # 主畫面
 # =============================================================================

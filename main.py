@@ -952,10 +952,14 @@ def season_rule(key: str, t) -> str:
 
 def rule_grid_html(t) -> str:
     h = '<div class="rule-grid">'
-    for k, *_ in         h += (f'<div class="rule-card"><div class="rule-name">{esc(t(k))}</div>'SEASONS:
-
-              f'<div class="rule-cond">{esc(season_rule(k, t))}</div>'
-              f'<div class="rule-items">{esc(t(k + "_items"))}</div></div>')
+    for k, *_ in SEASONS:
+        h += (
+            f'<div class="rule-card">'
+            f'<div class="rule-name">{esc(t(k))}</div>'
+            f'<div class="rule-cond">{esc(season_rule(k, t))}</div>'
+            f'<div class="rule-items">{esc(t(k + "_items"))}</div>'
+            f'</div>'
+        )
     return h + "</div>"
 
 

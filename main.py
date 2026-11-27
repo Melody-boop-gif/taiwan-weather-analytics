@@ -1404,18 +1404,7 @@ def set_question(text: str) -> None:
 
 
 
-# ---- PDF 下載 ----
-try:
-    pdf_bytes = build_pdf(city_name, lang, t, metrics, signals, summary, years, monthly, df, cards)
-    st.download_button(
-        "📄 下載 PDF 報告" if lang == "zh" else "📄 Download PDF report",
-        data=pdf_bytes,
-        file_name=f"weather_{city}_{end.date()}.pdf",
-        mime="application/pdf",
-        key="pdf_dl",
-    )
-except Exception as exc:
-    st.warning(f"PDF 產生失敗：{exc}")
+
 # =============================================================================
 # 主畫面
 # =============================================================================
@@ -1631,6 +1620,18 @@ with st.container(key="sec4"):
 
 st.markdown(f'<div class="footnote">{esc(t("footnote"))}</div>', unsafe_allow_html=True)
 
+# ---- PDF 下載 ----
+try:
+    pdf_bytes = build_pdf(city_name, lang, t, metrics, signals, summary, years, monthly, df, cards)
+    st.download_button(
+        "📄 下載 PDF 報告" if lang == "zh" else "📄 Download PDF report",
+        data=pdf_bytes,
+        file_name=f"weather_{city}_{end.date()}.pdf",
+        mime="application/pdf",
+        key="pdf_dl",
+    )
+except Exception as exc:
+    st.warning(f"PDF 產生失敗：{exc}")
 # ---- 右下角 AI ----
 with st.container(key="ai_float"):
     with st.popover("💬 " + t("ask_ai")):

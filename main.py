@@ -1280,7 +1280,8 @@ def build_pdf(city_name, lang, t, metrics, signals, summary, years, monthly, df,
                             title=f"Taiwan Weather Analytics - {city_name}")
     ink = colors.HexColor(INK)
     accent = colors.HexColor(ACCENT)
-    sty = lambda **kw: ParagraphStyle("x", fontName=PDF_FONT, textColor=ink, **kw)
+    
+    sty = lambda **kw: ParagraphStyle("x", fontName=PDF_FONT, **({"textColor": ink} | kw))
     s_title = sty(fontSize=22, leading=28)
     s_sub = sty(fontSize=9.5, leading=14, textColor=colors.HexColor("#64748B"))
     s_h = sty(fontSize=13, leading=18, spaceBefore=12, spaceAfter=6)
